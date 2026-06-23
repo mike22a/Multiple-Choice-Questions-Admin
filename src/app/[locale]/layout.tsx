@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { NextIntlClientProvider, useMessages } from 'next-intl';
 import { locales } from '@/navigation';
 import { notFound } from 'next/navigation';
+import SessionExpiredModal from '@/components/SessionExpiredModal';
 
 type Props = {
   children: ReactNode;
@@ -25,6 +26,7 @@ export default function LocaleLayout({ children, params: { locale } }: Props) {
       <body className="min-h-screen antialiased bg-background text-foreground">
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
+          <SessionExpiredModal />
         </NextIntlClientProvider>
       </body>
     </html>

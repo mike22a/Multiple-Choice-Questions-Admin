@@ -7,7 +7,7 @@ interface FetchOptions extends RequestInit {
 }
 
 export async function apiClient(endpoint: string, options: FetchOptions = {}) {
-  const { token, setAuth, clearAuth } = useAuthStore.getState();
+  const { token, setAuth, clearAuth, setSessionExpired } = useAuthStore.getState();
   
   const headers = new Headers(options.headers);
   if (token && !headers.has('Authorization')) {
@@ -58,10 +58,10 @@ export async function apiClient(endpoint: string, options: FetchOptions = {}) {
           });
         }
       } else {
-        clearAuth();
+        setSessionExpired(true);
       }
     } catch (err) {
-      clearAuth();
+      setSessionExpired(true);
     }
   }
 
