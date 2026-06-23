@@ -90,11 +90,13 @@ export default function ResultsPage() {
     setIsLoading(true);
     try {
       // Load dashboard stats which includes recent attempts
-      const stats = await apiClient('/api/admin/dashboard/stats');
-      setAttempts(stats.recentAttempts || []);
+      const statsRes = await apiClient('/api/admin/dashboard/stats');
+      const stats = statsRes?.data || statsRes;
+      setAttempts(stats?.recentAttempts || []);
 
       // Load quizzes for filter
-      const quizList = await apiClient('/api/admin/quizzes');
+      const quizListRes = await apiClient('/api/admin/quizzes');
+      const quizList = quizListRes?.data || quizListRes;
       setQuizzes(quizList.map((q: any) => ({ id: q.id, title: q.title })));
     } catch (err: any) {
       setError(err?.message || 'Failed to load results');
@@ -112,8 +114,8 @@ export default function ResultsPage() {
     setAttemptDetail(null);
     setSelectedAttemptId(id);
     try {
-      const data = await apiClient(`/api/admin/attempts/${id}`);
-      setAttemptDetail(data);
+      const res = await apiClient(`/api/admin/attempts/${id}`);
+      setAttemptDetail(res?.data || res);
     } catch (err: any) {
       alert(err?.message || 'Failed to load attempt details');
       setSelectedAttemptId(null);

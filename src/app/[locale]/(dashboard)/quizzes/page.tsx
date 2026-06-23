@@ -90,8 +90,8 @@ export default function QuizzesPage() {
   const loadQuizzes = async () => {
     setIsLoading(true);
     try {
-      const data = await apiClient('/api/admin/quizzes');
-      setQuizzes(data);
+      const res = await apiClient('/api/admin/quizzes');
+      setQuizzes(res?.data || res || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load quizzes');
     } finally {
@@ -185,12 +185,13 @@ export default function QuizzesPage() {
 
   const togglePublish = async (quiz: Quiz) => {
     try {
-      const data = await apiClient(`/api/admin/quizzes/${quiz.id}/publish`, {
+      const res = await apiClient(`/api/admin/quizzes/${quiz.id}/publish`, {
         method: 'PATCH',
         body: JSON.stringify({ is_published: !quiz.is_published }),
       });
+      const data = res?.data || res;
       // update state locally
-      setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, is_published: data.isPublished } : q));
+      setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, is_published: data.is_published } : q));
     } catch (err: any) {
       alert(err?.message || 'Failed to update publication status');
     }
@@ -198,11 +199,12 @@ export default function QuizzesPage() {
 
   const toggleSafeMode = async (quiz: Quiz) => {
     try {
-      const data = await apiClient(`/api/admin/quizzes/${quiz.id}/safe-mode`, {
+      const res = await apiClient(`/api/admin/quizzes/${quiz.id}/safe-mode`, {
         method: 'PATCH',
         body: JSON.stringify({ safe_mode: !quiz.safe_mode }),
       });
-      setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, safe_mode: data.safeMode } : q));
+      const data = res?.data || res;
+      setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, safe_mode: data.safe_mode } : q));
     } catch (err: any) {
       alert(err?.message || 'Failed to update safe mode status');
     }

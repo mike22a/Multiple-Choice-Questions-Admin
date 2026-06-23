@@ -73,8 +73,8 @@ export default function ParticipantsPage() {
   const loadParticipants = async () => {
     setIsLoading(true);
     try {
-      const data = await apiClient('/api/admin/users');
-      setParticipants(data || []);
+      const res = await apiClient('/api/admin/users');
+      setParticipants(res?.data || res || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load participants');
     } finally {
@@ -115,10 +115,11 @@ export default function ParticipantsPage() {
 
   const toggleStatus = async (user: Participant) => {
     try {
-      const data = await apiClient(`/api/admin/users/${user.id}/activate`, {
+      const res = await apiClient(`/api/admin/users/${user.id}/activate`, {
         method: 'PATCH',
         body: JSON.stringify({ is_active: !user.isActive }),
       });
+      const data = res?.data || res;
       setParticipants(participants.map(p => p.id === user.id ? { ...p, isActive: data.isActive } : p));
     } catch (err: any) {
       alert(err?.message || 'Failed to update activation status');

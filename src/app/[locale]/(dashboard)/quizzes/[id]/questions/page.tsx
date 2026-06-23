@@ -116,15 +116,17 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     setIsLoading(true);
     try {
       // Fetch quiz details first
-      const quiz = await apiClient(`/api/admin/quizzes`);
+      const quizRes = await apiClient(`/api/admin/quizzes`);
+      const quiz = quizRes?.data || quizRes;
       const targetQuiz = quiz.find((q: any) => q.id === quizId);
       if (targetQuiz) {
         setQuizTitle(targetQuiz.title);
       }
 
       // Fetch questions
-      const data = await apiClient(`/api/admin/quizzes/${quizId}/questions`);
-      setQuestions(data || []);
+      const dataRes = await apiClient(`/api/admin/quizzes/${quizId}/questions`);
+      const data = dataRes?.data || dataRes || [];
+      setQuestions(data);
       
       // Auto expand the first question if exists
       if (data && data.length > 0) {

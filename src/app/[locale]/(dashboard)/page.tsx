@@ -41,8 +41,8 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
   useEffect(() => {
     async function loadStats() {
       try {
-        const data = await apiClient('/api/admin/dashboard/stats');
-        setStats(data);
+        const res = await apiClient('/api/admin/dashboard/stats');
+        setStats(res?.data || res);
       } catch (err: any) {
         setError(err?.message || 'Failed to fetch dashboard stats');
       } finally {
