@@ -1,0 +1,31 @@
+{
+  "Common": {
+    "title": "Panel Admin MCQ",
+    "loading": "Memuat...",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "edit": "Ubah",
+    "create": "Buat",
+    "actions": "Aksi",
+    "search": "Cari",
+    "logout": "Keluar",
+    "login": "Masuk",
+    "back": "Kembali"
+  },
+  "Auth": {
+    "loginTitle": "Masuk ke Admin MCQ",
+    "username": "Nama Pengguna",
+    "password": "Kata Sandi",
+    "signIn": "Masuk",
+    "loggingIn": "Memproses Masuk...",
+    "invalidCredentials": "Nama pengguna atau kata sandi salah"
+  },
+  "Sidebar": {
+    "dashboard": "Dasbor",
+    "quizzes": "Kuis",
+    "participants": "Peserta",
+    "results": "Nilai & Laporan",
+    "settings": "Pengaturan"
+  }
+}

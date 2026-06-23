@@ -1,0 +1,31 @@
+{
+  "Common": {
+    "title": "MCQ Admin Panel",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "actions": "Actions",
+    "search": "Search",
+    "logout": "Logout",
+    "login": "Login",
+    "back": "Back"
+  },
+  "Auth": {
+    "loginTitle": "Sign in to MCQ Admin",
+    "username": "Username",
+    "password": "Password",
+    "signIn": "Sign In",
+    "loggingIn": "Signing In...",
+    "invalidCredentials": "Invalid username or password"
+  },
+  "Sidebar": {
+    "dashboard": "Dashboard",
+    "quizzes": "Quizzes",
+    "participants": "Participants",
+    "results": "Results & Reports",
+    "settings": "Settings"
+  }
+}
