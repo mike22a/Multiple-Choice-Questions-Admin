@@ -33,16 +33,29 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Monitor store hydration
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHasHydrated(true);
+      return;
+    }
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHasHydrated(true);
+    });
+    return () => unsub();
+  }, []);
 
   // Authentication Guard + Hydration safety
   useEffect(() => {
     setIsMounted(true);
-    if (!isAuthenticated) {
+    if (hasHydrated && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
-  if (!isMounted || !isAuthenticated) {
+  if (!isMounted || !hasHydrated || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
         <div className="flex flex-col items-center gap-3">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,8 +24,16 @@ export default function LoginPage({ params: { locale } }: { params: { locale: st
   const pathname = usePathname();
   
   const setAuth = useAuthStore((state) => state.setAuth);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (useAuthStore.persist.hasHydrated() && isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
 
   const {
     register,
