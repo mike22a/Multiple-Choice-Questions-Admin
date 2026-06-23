@@ -7,7 +7,7 @@ interface FetchOptions extends RequestInit {
 }
 
 export async function apiClient(endpoint: string, options: FetchOptions = {}) {
-  const { token } = useAuthStore.getState();
+  const { token, setAuth, clearAuth } = useAuthStore.getState();
   
   const headers = new Headers(options.headers);
   if (token && !headers.has('Authorization')) {
@@ -24,10 +24,46 @@ export async function apiClient(endpoint: string, options: FetchOptions = {}) {
     url += `?${searchParams.toString()}`;
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
+    credentials: 'include',
     ...options,
     headers,
   });
+
+  // If 401 Unauthorized, try to refresh token silently using cookies
+  if (response.status === 401 && endpoint !== '/api/auth/admin/login' && endpoint !== '/api/auth/admin/refresh') {
+    try {
+      const refreshRes = await fetch(`${API_URL}/api/auth/admin/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        const newToken = refreshData?.data?.token || refreshData?.token;
+        if (newToken) {
+          const { profile } = useAuthStore.getState();
+          if (profile) {
+            setAuth(newToken, profile);
+          }
+          
+          headers.set('Authorization', `Bearer ${newToken}`);
+          response = await fetch(url, {
+            credentials: 'include',
+            ...options,
+            headers,
+          });
+        }
+      } else {
+        clearAuth();
+      }
+    } catch (err) {
+      clearAuth();
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
