@@ -74,7 +74,8 @@ export default function ParticipantsPage() {
     setIsLoading(true);
     try {
       const res = await apiClient('/api/admin/users');
-      setParticipants(res?.data || res || []);
+      const data = res?.data || res;
+      setParticipants(data?.participants || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load participants');
     } finally {
