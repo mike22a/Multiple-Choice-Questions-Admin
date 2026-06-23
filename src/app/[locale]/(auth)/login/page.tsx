@@ -45,8 +45,10 @@ export default function LoginPage({ params: { locale } }: { params: { locale: st
         body: JSON.stringify(data),
       });
 
-      if (response && response.token && response.profile) {
-        setAuth(response.token, response.profile);
+      const resData = response?.data;
+
+      if (resData && resData.token && resData.profile) {
+        setAuth(resData.token, resData.profile);
         router.push('/');
       } else {
         setError(t('invalidCredentials'));
