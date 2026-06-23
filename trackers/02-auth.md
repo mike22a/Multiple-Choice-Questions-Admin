@@ -12,3 +12,4 @@ This tracker covers the login form, client-side session storage (Zustand), silen
 | A2.4 | Build dashboard logout trigger | ✅ | Implemented logout flow clearing Zustand state |
 | A2.5 | Implement main layout responsive sidebar & header | ✅ | Responsive sidebar collapsible with mobile overlays |
 | A2.6 | Build language toggle buttons | ✅ | Custom toggle switches locales inline dynamically |
+| A2.7 | Resolve hydration race condition for persisted Zustand session | ⏳ | Plan prepared: wait for Zustand persist hydration before executing auth guard redirects in layout |
