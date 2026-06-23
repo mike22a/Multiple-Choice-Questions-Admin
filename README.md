@@ -1,7 +1,7 @@
 # 🛠️ Quiz App — Admin Dashboard
 
 > **Admin Control Panel** — Full-featured management interface for quiz creation, participant management, and results reporting. Superadmins and admins control the entire quiz ecosystem from here.
-
+ 
 ---
 
 ## 📌 Overview
