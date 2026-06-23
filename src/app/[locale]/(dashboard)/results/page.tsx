@@ -97,7 +97,8 @@ export default function ResultsPage() {
       // Load quizzes for filter
       const quizListRes = await apiClient('/api/admin/quizzes');
       const quizList = quizListRes?.data || quizListRes;
-      setQuizzes(quizList.map((q: any) => ({ id: q.id, title: q.title })));
+      const quizzesData = quizList?.quizzes || quizList || [];
+      setQuizzes(quizzesData.map((q: any) => ({ id: q.id, title: q.title })));
     } catch (err: any) {
       setError(err?.message || 'Failed to load results');
     } finally {

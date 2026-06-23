@@ -118,7 +118,8 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       // Fetch quiz details first
       const quizRes = await apiClient(`/api/admin/quizzes`);
       const quiz = quizRes?.data || quizRes;
-      const targetQuiz = quiz.find((q: any) => q.id === quizId);
+      const quizzesData = quiz?.quizzes || quiz || [];
+      const targetQuiz = quizzesData.find((q: any) => q.id === quizId);
       if (targetQuiz) {
         setQuizTitle(targetQuiz.title);
       }

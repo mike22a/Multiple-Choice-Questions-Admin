@@ -91,7 +91,8 @@ export default function QuizzesPage() {
     setIsLoading(true);
     try {
       const res = await apiClient('/api/admin/quizzes');
-      setQuizzes(res?.data || res || []);
+      const data = res?.data || res;
+      setQuizzes(data?.quizzes || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load quizzes');
     } finally {
