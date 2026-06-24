@@ -15,7 +15,8 @@ import {
   X, 
   Globe, 
   User,
-  ChevronDown
+  ChevronDown,
+  FolderTree
 } from 'lucide-react';
 
 type Props = {
@@ -69,6 +70,7 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
   const navItems = [
     { name: t('dashboard'), href: '/', icon: LayoutDashboard },
     { name: t('quizzes'), href: '/quizzes', icon: BookOpen },
+    { name: t('categories'), href: '/categories', icon: FolderTree },
     { name: t('participants'), href: '/participants', icon: Users },
     { name: t('results'), href: '/results', icon: BarChart3 },
     { name: t('settings'), href: '/settings', icon: Settings },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,13 +23,17 @@ import {
   HelpCircle,
   X,
   Check,
-  Settings2
+  Settings2,
+  Upload,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const quizSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
+  category_id: z.string().uuid('Invalid category format').optional().nullable(),
   duration_minutes: z.coerce.number().min(1, 'Duration must be at least 1 minute'),
   max_attempts: z.coerce.number().min(1, 'Max attempts must be at least 1'),
   pass_score: z.coerce.number().min(1).max(100, 'Pass score must be between 1 and 100'),
@@ -44,10 +48,18 @@ const quizSchema = z.object({
 
 type QuizFormValues = z.infer<typeof quizSchema>;
 
+interface Category {
+  id: string;
+  name: string;
+  depth: number;
+  is_system: boolean;
+}
+
 interface Quiz {
   id: string;
   title: string;
   description: string;
+  category_id: string | null;
   slug: string;
   duration_minutes: number;
   max_attempts: number;
@@ -68,6 +80,7 @@ export default function QuizzesPage() {
   const tc = useTranslations('Common');
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
@@ -76,6 +89,14 @@ export default function QuizzesPage() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+
+  // CSV Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importErrors, setImportErrors] = useState<any[]>([]);
+  const quizFileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -100,15 +121,78 @@ export default function QuizzesPage() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const res = await apiClient('/api/admin/categories');
+      const data = res?.data || res;
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load categories', err);
+    }
+  };
+
   useEffect(() => {
     loadQuizzes();
+    loadCategories();
   }, []);
+
+  // CSV Import handlers
+  const handleCsvSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+    setImportErrors([]);
+    setImportPreview([]);
+
+    const text = await file.text();
+    const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+    const parsedPreview = [];
+    for (let i = 1; i < Math.min(lines.length, 6); i++) {
+      const parts = lines[i].split(',').map(p => p.replace(/^["']|["']$/g, ''));
+      parsedPreview.push({
+        title: parts[0] || '',
+        description: parts[1] || '',
+        duration: parts[2] || '',
+        pass_score: parts[3] || '',
+        category_name: parts[4] || '',
+      });
+    }
+    setImportPreview(parsedPreview);
+  };
+
+  const handleCsvImportSubmit = async () => {
+    if (!importFile) return;
+
+    setIsImporting(true);
+    setImportErrors([]);
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+
+    try {
+      await apiClient('/api/admin/quizzes/import', {
+        method: 'POST',
+        body: formData,
+      });
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      loadQuizzes();
+    } catch (err: any) {
+      setImportErrors([{ error: err.message || 'Import failed.' }]);
+    } finally {
+      setIsImporting(false);
+      if (quizFileInputRef.current) quizFileInputRef.current.value = '';
+    }
+  };
 
   const openCreateModal = () => {
     setEditingQuiz(null);
     reset({
       title: '',
       description: '',
+      category_id: null,
       duration_minutes: 30,
       max_attempts: 1,
       pass_score: 70,
@@ -128,6 +212,7 @@ export default function QuizzesPage() {
     reset({
       title: quiz.title,
       description: quiz.description || '',
+      category_id: quiz.category_id,
       duration_minutes: quiz.duration_minutes,
       max_attempts: quiz.max_attempts,
       pass_score: quiz.pass_score,
@@ -147,6 +232,7 @@ export default function QuizzesPage() {
     try {
       const payload = {
         ...data,
+        category_id: data.category_id || null,
         available_from: data.available_from ? new Date(data.available_from).toISOString() : null,
         available_until: data.available_until ? new Date(data.available_until).toISOString() : null,
       };
@@ -224,13 +310,23 @@ export default function QuizzesPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-white">Quiz Management</h1>
           <p className="mt-2 text-slate-400">Configure exams, questions, and view candidate enrollment parameters.</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 hover:brightness-110 active:scale-[0.98] transition self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Create Quiz</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Import CSV</span>
+          </button>
+          
+          <button
+            onClick={openCreateModal}
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 hover:brightness-110 active:scale-[0.98] transition"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Create Quiz</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and search bar */}
@@ -264,6 +360,19 @@ export default function QuizzesPage() {
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${quiz.is_published ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
                     {quiz.is_published ? 'Published' : 'Draft'}
                   </span>
+                </div>
+
+                {/* Category Badge */}
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {quiz.category_id ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                      {categories.find(c => c.id === quiz.category_id)?.name || 'Loading Category...'}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Uncategorized
+                    </span>
+                  )}
                 </div>
 
                 <p className="mt-2 text-xs text-slate-400 line-clamp-2 h-8">{quiz.description || 'No description provided.'}</p>
@@ -436,6 +545,28 @@ export default function QuizzesPage() {
                 />
               </div>
 
+              {/* Category selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Quiz Category</label>
+                <select
+                  {...register('category_id')}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setValue('category_id', val === '' ? null : val);
+                  }}
+                >
+                  <option value="">[ Uncategorized ]</option>
+                  {categories
+                    .filter((c) => !c.is_system || c.name === 'Sample Tests')
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {'\u00A0'.repeat(c.depth * 3)} {c.depth > 0 ? '↳ ' : ''}{c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               {/* Stats: Duration, Max Attempts, Pass Score */}
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
@@ -545,6 +676,135 @@ export default function QuizzesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-[95%] max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-blue-400" />
+                <span>Bulk Import Quizzes & Questions</span>
+              </h2>
+              <button 
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportFile(null);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                }} 
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>Upload a CSV file containing quizzes, questions, options, and correctness mappings.</span>
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/import/template`}
+                  download="quizzes_template.csv"
+                  className="flex items-center gap-1.5 text-blue-400 hover:underline font-semibold"
+                >
+                  <Download className="h-3 w-3" />
+                  Download CSV Template
+                </a>
+              </div>
+
+              {/* Drag and Drop Zone */}
+              <div
+                onClick={() => quizFileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center hover:border-blue-500/50 hover:bg-slate-950/20 cursor-pointer transition"
+              >
+                <input
+                  type="file"
+                  ref={quizFileInputRef}
+                  accept=".csv"
+                  onChange={handleCsvSelect}
+                  className="hidden"
+                />
+                <Upload className="mx-auto h-10 w-10 text-slate-500 mb-3" />
+                <p className="text-sm font-semibold text-slate-200">
+                  {importFile ? importFile.name : 'Click to upload Quiz CSV'}
+                </p>
+                <p className="text-xs text-slate-550 mt-1">Accepts only .csv files</p>
+              </div>
+
+              {/* Preview */}
+              {importPreview.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">Preview (First 5 Rows):</p>
+                  <div className="rounded-xl border border-slate-850 overflow-hidden bg-slate-950/40 text-xs">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-950/60 border-b border-slate-850 text-slate-400">
+                          <th className="p-2.5">Title</th>
+                          <th className="p-2.5">Category</th>
+                          <th className="p-2.5">Duration</th>
+                          <th className="p-2.5">Pass %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-850">
+                        {importPreview.map((row, idx) => (
+                          <tr key={idx} className="text-slate-300">
+                            <td className="p-2.5 font-medium">{row.title}</td>
+                            <td className="p-2.5 font-mono">{row.category_name || '-'}</td>
+                            <td className="p-2.5 font-mono">{row.duration} mins</td>
+                            <td className="p-2.5 font-mono">{row.pass_score}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Errors report */}
+              {importErrors.length > 0 && (
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-2">
+                  <p className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4" />
+                    Import Errors Found:
+                  </p>
+                  <ul className="text-xs text-slate-400 list-disc list-inside space-y-1">
+                    {importErrors.map((err, idx) => (
+                      <li key={idx}>
+                        {err.rowNum ? `Row ${err.rowNum}: ` : ''}{err.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportFile(null);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                }}
+                className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
+              >
+                {tc('cancel')}
+              </button>
+              <button
+                onClick={handleCsvImportSubmit}
+                disabled={isImporting || !importFile}
+                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-500 disabled:opacity-50 transition"
+              >
+                {isImporting && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                )}
+                <span>Import</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -24,6 +24,7 @@
   "Sidebar": {
     "dashboard": "Dashboard",
     "quizzes": "Quizzes",
+    "categories": "Categories",
     "participants": "Participants",
     "results": "Results & Reports",
     "settings": "Settings"

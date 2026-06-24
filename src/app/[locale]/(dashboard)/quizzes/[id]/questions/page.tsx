@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useRouter, Link } from '@/navigation';
 import { useTranslations } from 'next-intl';
+import CodeBlock from '@/components/CodeBlock';
 import { 
   ArrowLeft,
   Plus, 
@@ -28,8 +29,10 @@ const questionSchema = z.object({
   question_text: z.string().min(1, 'Question text is required'),
   question_type: z.enum(['single', 'multiple']),
   points: z.coerce.number().min(1, 'Points must be at least 1'),
-  explanation: z.string().optional(),
+  explanation: z.string().optional().nullable(),
   order_num: z.coerce.number().min(1),
+  code_language: z.string().optional().nullable(),
+  code_content: z.string().optional().nullable(),
 });
 
 type QuestionFormValues = z.infer<typeof questionSchema>;
@@ -62,6 +65,8 @@ interface Question {
   points: number;
   explanation: string | null;
   order_num: number;
+  code_language?: string | null;
+  code_content?: string | null;
   options?: AnswerOption[];
   images?: QuestionImage[];
 }
@@ -97,10 +102,14 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     register: registerQ,
     handleSubmit: handleSubmitQ,
     reset: resetQ,
+    watch: watchQ,
     formState: { errors: errorsQ },
   } = useForm<QuestionFormValues>({
     resolver: zodResolver(questionSchema),
   });
+
+  const watchLanguage = watchQ('code_language');
+  const watchCodeContent = watchQ('code_content');
 
   const {
     register: registerOpt,
@@ -157,6 +166,8 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       points: 10,
       explanation: '',
       order_num: questions.length + 1,
+      code_language: '',
+      code_content: '',
     });
     setIsQModalOpen(true);
   };
@@ -169,6 +180,8 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       points: q.points,
       explanation: q.explanation || '',
       order_num: q.order_num,
+      code_language: q.code_language || '',
+      code_content: q.code_content || '',
     });
     setIsQModalOpen(true);
   };
@@ -393,6 +406,11 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                   {/* Expanded Body Panel */}
                   {isExpanded && (
                     <div className="px-6 pb-6 border-t border-slate-900/60 pt-6 space-y-6">
+                      {/* Code Block */}
+                      {q.code_language && q.code_content && (
+                        <CodeBlock language={q.code_language} code={q.code_content} />
+                      )}
+
                       {/* Question Images */}
                       {q.images && q.images.length > 0 && (
                         <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
@@ -566,6 +584,58 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                   />
                   {errorsQ.order_num && <p className="text-xs text-rose-400">{errorsQ.order_num.message}</p>}
                 </div>
+              </div>
+
+              {/* Code block section */}
+              <div className="space-y-4 border-t border-slate-800/60 pt-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Code Snippet Language (Optional)</label>
+                  <select
+                    {...registerQ('code_language')}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
+                  >
+                    <option value="">None (Plain text question)</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="python">Python</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="sql">SQL</option>
+                    <option value="json">JSON</option>
+                    <option value="bash">Bash</option>
+                    <option value="go">Go</option>
+                    <option value="rust">Rust</option>
+                    <option value="csharp">C#</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="php">PHP</option>
+                    <option value="ruby">Ruby</option>
+                    <option value="swift">Swift</option>
+                    <option value="kotlin">Kotlin</option>
+                    <option value="yaml">YAML</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="xml">XML</option>
+                  </select>
+                </div>
+
+                {watchLanguage && watchLanguage !== '' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-300">Code Snippet Content</label>
+                    <textarea
+                      rows={5}
+                      {...registerQ('code_content')}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 font-mono text-xs text-slate-200 outline-none focus:border-blue-500 resize-y"
+                      placeholder="Paste your syntax code block here..."
+                    />
+
+                    {watchCodeContent && watchCodeContent.trim() !== '' && (
+                      <div className="space-y-1.5 pt-2">
+                        <span className="text-xs font-bold text-slate-500">Live Code Preview</span>
+                        <CodeBlock language={watchLanguage} code={watchCodeContent} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

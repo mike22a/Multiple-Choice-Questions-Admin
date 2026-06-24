@@ -16,8 +16,36 @@ import {
   Check,
   UserPlus,
   ArrowUpDown,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FolderTree,
+  Lock,
+  ShieldAlert,
+  Info
 } from 'lucide-react';
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  parent_id: string | null;
+  depth: number;
+  path: string;
+  is_system: boolean;
+}
+
+interface UserCategoryAccess {
+  id: string;
+  category_id: string;
+  created_at: string;
+  quiz_categories: {
+    id: string;
+    name: string;
+    slug: string;
+    depth: number;
+    path: string;
+  };
+}
 
 const participantSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -60,6 +88,14 @@ export default function ParticipantsPage() {
     totalCount: number;
     errors: Array<{ rowNum: number; email?: string; username?: string; error: string }>;
   } | null>(null);
+
+  // Category Access Control States
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [selectedAccessUser, setSelectedAccessUser] = useState<Participant | null>(null);
+  const [userAccessList, setUserAccessList] = useState<UserCategoryAccess[]>([]);
+  const [isLoadingAccess, setIsLoadingAccess] = useState(false);
+  const [isAccessActionLoading, setIsAccessActionLoading] = useState<string | null>(null);
 
   const {
     register,
@@ -124,6 +160,62 @@ export default function ParticipantsPage() {
       setParticipants(participants.map(p => p.id === user.id ? { ...p, isActive: data.isActive } : p));
     } catch (err: any) {
       alert(err?.message || 'Failed to update activation status');
+    }
+  };
+
+  const fetchAllCategories = async () => {
+    try {
+      const res = await apiClient('/api/admin/categories');
+      const data = res?.data || res;
+      setAllCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load categories', err);
+    }
+  };
+
+  const openCategoryAccessModal = async (user: Participant) => {
+    setSelectedAccessUser(user);
+    setIsAccessModalOpen(true);
+    setIsLoadingAccess(true);
+    if (allCategories.length === 0) {
+      await fetchAllCategories();
+    }
+    try {
+      const res = await apiClient(`/api/admin/users/${user.id}/category-access`);
+      const data = res?.data || res;
+      setUserAccessList(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to retrieve user category access permissions');
+    } finally {
+      setIsLoadingAccess(false);
+    }
+  };
+
+  const handleToggleAccess = async (category: Category) => {
+    if (!selectedAccessUser) return;
+    
+    const isDirectlyAssigned = userAccessList.some((a) => a.category_id === category.id);
+    
+    setIsAccessActionLoading(category.id);
+    try {
+      if (isDirectlyAssigned) {
+        await apiClient(`/api/admin/users/${selectedAccessUser.id}/category-access/${category.id}`, {
+          method: 'DELETE',
+        });
+      } else {
+        await apiClient(`/api/admin/users/${selectedAccessUser.id}/category-access`, {
+          method: 'POST',
+          body: JSON.stringify({ category_id: category.id }),
+        });
+      }
+      
+      const res = await apiClient(`/api/admin/users/${selectedAccessUser.id}/category-access`);
+      const data = res?.data || res;
+      setUserAccessList(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update category access');
+    } finally {
+      setIsAccessActionLoading(null);
     }
   };
 
@@ -301,6 +393,12 @@ export default function ParticipantsPage() {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <button
+                        onClick={() => openCategoryAccessModal(user)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold border border-blue-500/20 text-blue-400 hover:bg-blue-500/10 mr-2 transition"
+                      >
+                        Category Access
+                      </button>
+                      <button
                         onClick={() => toggleStatus(user)}
                         className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${user.isActive ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
                       >
@@ -406,6 +504,165 @@ export default function ParticipantsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Category Access Modal */}
+      {isAccessModalOpen && selectedAccessUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-[95%] max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Manage Category Access</h2>
+                <p className="text-xs text-slate-400 mt-1">Assign category access to candidate: <span className="font-semibold text-white">{selectedAccessUser.fullName}</span></p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsAccessModalOpen(false);
+                  setSelectedAccessUser(null);
+                  setUserAccessList([]);
+                }} 
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {isLoadingAccess ? (
+              <div className="flex h-36 items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500/20 border-t-blue-500" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* No restrictions info banner */}
+                {userAccessList.length === 0 ? (
+                  <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 p-4 text-xs text-blue-400 flex gap-2.5">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">No Custom Category Restrictions</p>
+                      <p className="mt-1 text-slate-400">This candidate is only allowed to access quizzes in the <span className="font-semibold text-white">Sample Tests</span> category.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-4 text-xs text-emerald-400 flex gap-2.5">
+                    <Check className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Custom Access Active</p>
+                      <p className="mt-1 text-slate-400">The candidate can access all quizzes in their assigned categories and all nested subcategories (inheritance-based).</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Categories tree with checkboxes */}
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Available Categories Tree</p>
+                  
+                  {/* Render Sample Tests & Uncategorized as special cases */}
+                  <div className="rounded-xl bg-slate-950/30 border border-slate-850 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400 opacity-60">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        <span className="font-semibold">Sample Tests</span>
+                      </div>
+                      <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">ALWAYS ACCESSIBLE</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-400 opacity-60">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        <span className="font-semibold">Uncategorized</span>
+                      </div>
+                      <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">ADMIN ONLY</span>
+                    </div>
+                  </div>
+
+                  <div className="divide-y divide-slate-850/50 mt-3">
+                    {allCategories
+                      .filter((c) => !c.is_system) // only show non-system categories
+                      .map((category) => {
+                        const isDirectlyAssigned = userAccessList.some((a) => a.category_id === category.id);
+                        
+                        const isInherited = userAccessList.some(
+                          (a) => a.category_id !== category.id && category.path.startsWith(a.quiz_categories?.path + '/')
+                        );
+                        
+                        const isChecked = isDirectlyAssigned || isInherited;
+                        const isPending = isAccessActionLoading === category.id;
+
+                        // Find which category grants inheritance
+                        const inheritingFrom = isInherited
+                          ? userAccessList.find(
+                              (a) => a.category_id !== category.id && category.path.startsWith(a.quiz_categories?.path + '/')
+                            )?.quiz_categories?.name
+                          : null;
+
+                        return (
+                          <div 
+                            key={category.id} 
+                            className="py-2.5 flex items-center justify-between gap-3 text-sm"
+                          >
+                            <div className="flex items-center">
+                              {/* Indent spacing */}
+                              <div 
+                                className="flex shrink-0" 
+                                style={{ width: `${category.depth * 16}px` }} 
+                              />
+                              {category.depth > 0 && (
+                                <div className="w-3 h-5 border-l border-b border-slate-800 -mt-2 mr-1.5 shrink-0" />
+                              )}
+                              <FolderTree className="h-3.5 w-3.5 text-slate-500 mr-2 shrink-0" />
+                              <span className={`font-medium ${isChecked ? 'text-white' : 'text-slate-400'}`}>
+                                {category.name}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {isInherited && (
+                                <span 
+                                  className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"
+                                  title={`Access inherited via ${inheritingFrom}`}
+                                >
+                                  ↳ Inherited via {inheritingFrom}
+                                </span>
+                              )}
+
+                              <button
+                                onClick={() => !isInherited && handleToggleAccess(category)}
+                                disabled={isPending || isInherited}
+                                className={`h-5 w-5 rounded border flex items-center justify-center transition focus:outline-none ${
+                                  isChecked 
+                                    ? 'bg-blue-600 border-blue-600 text-white' 
+                                    : 'border-slate-800 bg-slate-950 text-transparent hover:border-slate-700'
+                                } ${isInherited ? 'opacity-60 cursor-not-allowed' : ''}`}
+                              >
+                                {isPending ? (
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                                ) : isChecked ? (
+                                  <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                ) : null}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end border-t border-slate-800 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAccessModalOpen(false);
+                  setSelectedAccessUser(null);
+                  setUserAccessList([]);
+                }}
+                className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

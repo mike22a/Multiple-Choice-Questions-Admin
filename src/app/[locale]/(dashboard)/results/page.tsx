@@ -18,6 +18,7 @@ import {
   FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+import CodeBlock from '@/components/CodeBlock';
 
 interface AttemptListItem {
   id: string;
@@ -53,6 +54,8 @@ interface AttemptDetail {
     questionType: 'single' | 'multiple';
     points: number;
     explanation: string | null;
+    codeLanguage?: string | null;
+    codeContent?: string | null;
     options: Array<{
       id: string;
       optionText: string;
@@ -389,6 +392,11 @@ export default function ResultsPage() {
                             <span>{q.points} pts</span>
                           </span>
                         </div>
+
+                        {/* Code Block */}
+                        {q.codeLanguage && q.codeContent && (
+                          <CodeBlock language={q.codeLanguage} code={q.codeContent} />
+                        )}
 
                         {/* Options List */}
                         <div className="space-y-2 pl-5 text-xs">
