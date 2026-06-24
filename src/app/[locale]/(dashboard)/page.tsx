@@ -136,9 +136,9 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
       </div>
 
       {/* Main Section */}
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-8 lg:grid-cols-3 w-full min-w-0">
         {/* Recent Attempts Table */}
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/20 p-6 backdrop-blur-xl lg:col-span-2 space-y-6">
+        <div className="rounded-2xl border border-slate-900 bg-slate-900/20 p-6 backdrop-blur-xl lg:col-span-2 space-y-6 w-full min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">Recent Quiz Attempts</h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-400">

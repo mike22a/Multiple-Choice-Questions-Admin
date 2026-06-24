@@ -133,7 +133,7 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
       </aside>
 
       {/* Main Dashboard Panel */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 w-full min-w-0">
         {/* Header bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950/70 px-6 backdrop-blur-md">
           <button
@@ -193,7 +193,7 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
         </header>
 
         {/* Dashboard Content Area */}
-        <main className="min-h-[calc(100vh-4rem)] p-6 lg:p-8">
+        <main className="min-h-[calc(100vh-4rem)] p-6 lg:p-8 w-full min-w-0">
           {children}
         </main>
       </div>

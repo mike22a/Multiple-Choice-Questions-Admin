@@ -337,7 +337,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : questions.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-4 w-full min-w-0">
           {questions
             .sort((a, b) => a.order_num - b.order_num)
             .map((q, index) => {

@@ -190,7 +190,7 @@ export default function SettingsPage() {
       {activeTab === 'system' && isSuperadmin && (
         <div className="space-y-6">
           {/* Mock registry list for design wow */}
-          <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl space-y-6">
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl space-y-6 w-full min-w-0 overflow-hidden">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Users className="h-5 w-5 text-indigo-400" />

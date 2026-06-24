@@ -251,7 +251,7 @@ export default function QuizzesPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : filteredQuizzes.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 w-full min-w-0">
           {filteredQuizzes.map((quiz) => (
             <div 
               key={quiz.id} 
