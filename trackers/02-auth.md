@@ -13,3 +13,5 @@ This tracker covers the login form, client-side session storage (Zustand), silen
 | A2.5 | Implement main layout responsive sidebar & header | ✅ | Responsive sidebar collapsible with mobile overlays |
 | A2.6 | Build language toggle buttons | ✅ | Custom toggle switches locales inline dynamically |
 | A2.7 | Resolve hydration race condition for persisted Zustand session | ✅ | Wait for Zustand persist hydration before executing auth guard redirects in layout |
+| A2.8 | Fix responsive horizontal layout overflow (viewport bleeding) | ✅ | Constrained layout container using relative and overflow-x-hidden |
+| A2.9 | Tune modal sizing & padding responsive constraints | ✅ | Redefined modal widths and paddings to fit beautifully on small screens |

@@ -24,7 +24,7 @@ export default function SessionExpiredModal() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-3xl border border-rose-500/20 bg-slate-900 p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+      <div className="w-[90%] max-w-sm rounded-2xl border border-rose-500/20 bg-slate-900 p-6 shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex justify-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-lg shadow-rose-500/5">
             <ShieldAlert className="h-7 w-7" />
