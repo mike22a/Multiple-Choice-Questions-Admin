@@ -8,6 +8,8 @@ import { apiClient } from '@/lib/api-client';
 import { useRouter, Link } from '@/navigation';
 import { useTranslations } from 'next-intl';
 import CodeBlock from '@/components/CodeBlock';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   ArrowLeft,
   Plus, 
@@ -87,6 +89,46 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
+  const showSwalConfirm = (title: string, text: string, confirmButtonText = tc('delete')) => {
+    return Swal.fire({
+      title,
+      text,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#dc2626', // red-600
+      cancelButtonColor: '#334155', // slate-700
+      confirmButtonText,
+      cancelButtonText: tc('cancel'),
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
 
   // Expanded questions map
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
@@ -227,20 +269,23 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       }
       setIsQModalOpen(false);
       loadData();
+      showSwalAlert(tc('success'), t('questionSaved') || 'Question saved successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || t('failedSaveQuestion'));
+      showSwalAlert(tc('error'), err?.message || t('failedSaveQuestion'), 'error');
     } finally {
       setIsQSubmitLoading(false);
     }
   };
 
   const handleDeleteQ = async (qId: string) => {
-    if (!confirm(t('deleteQuestionConfirm'))) return;
+    const result = await showSwalConfirm(t('deleteQuestionConfirm') || tc('confirmDelete'), '');
+    if (!result.isConfirmed) return;
     try {
       await apiClient(`/api/admin/questions/${qId}`, { method: 'DELETE' });
       loadData();
+      showSwalAlert(tc('success'), t('questionDeleted') || 'Question deleted successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || t('failedDeleteQuestion'));
+      showSwalAlert(tc('error'), err?.message || t('failedDeleteQuestion'), 'error');
     }
   };
 
@@ -293,20 +338,23 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       }
       setIsOptModalOpen(false);
       loadData();
+      showSwalAlert(tc('success'), t('optionSaved') || 'Option saved successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || t('failedSaveOption'));
+      showSwalAlert(tc('error'), err?.message || t('failedSaveOption'), 'error');
     } finally {
       setIsOptSubmitLoading(false);
     }
   };
 
   const handleDeleteOpt = async (optId: string) => {
-    if (!confirm(t('deleteOptionConfirm'))) return;
+    const result = await showSwalConfirm(t('deleteOptionConfirm') || tc('confirmDelete'), '');
+    if (!result.isConfirmed) return;
     try {
       await apiClient(`/api/admin/options/${optId}`, { method: 'DELETE' });
       loadData();
+      showSwalAlert(tc('success'), t('optionDeleted') || 'Option deleted successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || t('failedDeleteOption'));
+      showSwalAlert(tc('error'), err?.message || t('failedDeleteOption'), 'error');
     }
   };
 
@@ -327,20 +375,23 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         body: formData,
       });
       loadData();
+      showSwalAlert(tc('success'), 'Image uploaded successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || 'Failed to upload image. Please check API connection.');
+      showSwalAlert(tc('error'), err?.message || 'Failed to upload image. Please check API connection.', 'error');
     } finally {
       setIsUploadingImage(null);
     }
   };
 
   const handleDeleteImage = async (imgId: string) => {
-    if (!confirm('Are you sure you want to delete this image?')) return;
+    const result = await showSwalConfirm('Are you sure you want to delete this image?', '');
+    if (!result.isConfirmed) return;
     try {
       await apiClient(`/api/admin/images/${imgId}`, { method: 'DELETE' });
       loadData();
+      showSwalAlert(tc('success'), 'Image deleted successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete image');
+      showSwalAlert(tc('error'), err?.message || 'Failed to delete image', 'error');
     }
   };
 
@@ -378,7 +429,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         )
       );
     } catch (err: any) {
-      alert(err?.message || 'Failed to update correct option');
+      showSwalAlert(tc('error'), err?.message || 'Failed to update correct option', 'error');
     } finally {
       setLoadingOptionId(null);
     }
@@ -413,7 +464,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         )
       );
     } catch (err: any) {
-      alert(err?.message || 'Failed to toggle option correctness');
+      showSwalAlert(tc('error'), err?.message || 'Failed to toggle option correctness', 'error');
     } finally {
       setLoadingOptionId(null);
     }
@@ -422,7 +473,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   const handleSavePointsInline = async (qId: string) => {
     const pointsNum = parseInt(tempPointsValue, 10);
     if (isNaN(pointsNum) || pointsNum < 1) {
-      alert('Points must be a valid integer greater than or equal to 1');
+      showSwalAlert(tc('warning'), 'Points must be a valid integer greater than or equal to 1', 'warning');
       return;
     }
 
@@ -442,8 +493,9 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         prev.map((item) => (item.id === qId ? { ...item, points: pointsNum } : item))
       );
       setEditingPointsQId(null);
+      showSwalAlert(tc('success'), 'Points updated successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || 'Failed to update points');
+      showSwalAlert(tc('error'), err?.message || 'Failed to update points', 'error');
     } finally {
       setInlineLoadingQId(null);
     }
@@ -454,7 +506,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     if (totalQuestions === 0) return;
 
     if (bulkType === 'distribute' && bulkTotalPointsValue < totalQuestions) {
-      alert(t('distributeErrorLess', { count: totalQuestions }));
+      showSwalAlert(tc('warning'), t('distributeErrorLess', { count: totalQuestions }), 'warning');
       return;
     }
 
@@ -469,11 +521,11 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         ),
       });
 
-      alert(t('pointsApplied'));
+      showSwalAlert(tc('success'), t('pointsApplied') || 'Points applied successfully', 'success');
       setIsBulkModalOpen(false);
       loadData();
     } catch (err: any) {
-      alert(err?.message || t('failedApplyPoints'));
+      showSwalAlert(tc('error'), err?.message || t('failedApplyPoints'), 'error');
     } finally {
       setIsBulkSubmitLoading(false);
     }

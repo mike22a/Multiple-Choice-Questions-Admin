@@ -18,7 +18,12 @@
     "showingRange": "Showing {start} to {end} of {total} entries",
     "loggedInAs": "Logged in as",
     "collapse": "Collapse Sidebar",
-    "expand": "Expand Sidebar"
+    "expand": "Expand Sidebar",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "confirmDelete": "Are you sure?"
   },
   "Auth": {
     "loginTitle": "Sign in to MCQ Admin",

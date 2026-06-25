@@ -18,7 +18,12 @@
     "showingRange": "Menampilkan {start} sampai {end} dari {total} entri",
     "loggedInAs": "Masuk sebagai",
     "collapse": "Sembunyikan Menu",
-    "expand": "Tampilkan Menu"
+    "expand": "Tampilkan Menu",
+    "error": "Error",
+    "success": "Sukses",
+    "warning": "Peringatan",
+    "info": "Informasi",
+    "confirmDelete": "Apakah Anda yakin?"
   },
   "Auth": {
     "loginTitle": "Masuk ke Admin MCQ",
