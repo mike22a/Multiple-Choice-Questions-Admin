@@ -427,7 +427,10 @@ export default function ResultsPage() {
                         {/* Explanation Box */}
                         {q.explanation && (
                           <div className="rounded-lg bg-slate-900 p-3 text-[11px] text-slate-400 border border-slate-800/40">
-                            <span className="font-bold text-slate-300">Explanation:</span> {q.explanation}
+                            <span className="font-bold text-slate-300 block mb-1">Explanation:</span>
+                            <div className="leading-relaxed">
+                              {renderExplanationWithCode(q.explanation)}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -451,4 +454,31 @@ export default function ResultsPage() {
       )}
     </div>
   );
+}
+
+function renderExplanationWithCode(text: string | null) {
+  if (!text) return null;
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('```') && part.endsWith('```')) {
+      const content = part.slice(3, -3);
+      const firstNewlineIdx = content.indexOf('\n');
+      let language = 'text';
+      let code = content;
+      if (firstNewlineIdx !== -1) {
+        const potentialLang = content.slice(0, firstNewlineIdx).trim();
+        if (potentialLang && potentialLang.length < 15) {
+          language = potentialLang;
+          code = content.slice(firstNewlineIdx + 1);
+        }
+      }
+      return <CodeBlock key={idx} language={language} code={code} />;
+    } else {
+      return (
+        <span key={idx} className="whitespace-pre-wrap block my-1">
+          {part}
+        </span>
+      );
+    }
+  });
 }
