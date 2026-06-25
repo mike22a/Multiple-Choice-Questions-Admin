@@ -109,10 +109,10 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
 
   return (
     <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div>
+      {/* Sticky Header wrapper */}
+      <div className="sticky top-16 z-30 bg-slate-950/90 -mx-6 px-6 py-5 md:-mx-8 md:px-8 -mt-6 lg:-mt-8 border-b border-slate-900 backdrop-blur-md">
         <h1 className="text-3xl font-extrabold tracking-tight text-white">{tDash('title')}</h1>
-        <p className="mt-2 text-slate-400">{tDash('subtitle')}</p>
+        <p className="mt-2 text-slate-400 text-xs sm:text-sm">{tDash('subtitle')}</p>
       </div>
 
       {/* KPI Cards Grid */}

@@ -446,7 +446,8 @@ export default function CategoriesPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : categories.length > 0 ? (
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
+        <>
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
@@ -578,38 +579,39 @@ export default function CategoriesPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination UI */}
-          {totalCategories > 0 && (
-            <div className="sticky bottom-16 lg:bottom-0 z-30 bg-slate-950/90 -mx-6 px-6 py-4 md:-mx-8 md:px-8 border-t border-slate-900 backdrop-blur-md mt-8 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-400">
-              <div>
-                {tc('showingRange', { start: (currentPage - 1) * itemsPerPage + 1, end: Math.min(currentPage * itemsPerPage, totalCategories), total: totalCategories })}
-              </div>
-              
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
-                  >
-                    {tc('previous')}
-                  </button>
-                  
-                  {renderPageNumbers()}
-                  
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
-                  >
-                    {tc('next')}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Pagination UI */}
+        {totalCategories > 0 && (
+          <div className="sticky bottom-16 lg:bottom-0 z-30 bg-slate-950/90 -mx-6 px-6 py-4 md:-mx-8 md:px-8 border-t border-slate-900 backdrop-blur-md mt-8 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+            <div>
+              {tc('showingRange', { start: (currentPage - 1) * itemsPerPage + 1, end: Math.min(currentPage * itemsPerPage, totalCategories), total: totalCategories })}
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                >
+                  {tc('previous')}
+                </button>
+                
+                {renderPageNumbers()}
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                >
+                  {tc('next')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500 bg-slate-900/5 backdrop-blur-xl">
           <FolderTree className="mx-auto mb-4 h-12 w-12 opacity-30 text-blue-400" />
