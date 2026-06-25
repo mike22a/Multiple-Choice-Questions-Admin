@@ -370,6 +370,19 @@
     "invalidQuestionText": "Question text is required",
     "invalidOptionText": "Option text is required",
     "pointsMin": "Points must be at least 0",
-    "orderNumMin": "Order must be at least 1"
+    "orderNumMin": "Order must be at least 1",
+    "managePoints": "Manage Points",
+    "equalPoints": "Set Equal Points",
+    "distributePoints": "Distribute Total Points",
+    "apply": "Apply",
+    "pointsApplied": "Points applied successfully",
+    "failedApplyPoints": "Failed to apply points updates",
+    "bulkPointsTitle": "Bulk Points Management",
+    "bulkPointsSub": "Configure weight/points for all active questions in this quiz.",
+    "pointsPerQuestion": "Points per Question",
+    "targetTotalPoints": "Target Total Points",
+    "distributePreview": "{remainder} questions will receive {high} points, and {rest} questions will receive {low} points (Total: {total} points).",
+    "distributePreviewEven": "All {count} questions will receive {points} points each (Total: {total} points).",
+    "distributeErrorLess": "Total points must be at least equal to the number of questions ({count})"
   }
 }

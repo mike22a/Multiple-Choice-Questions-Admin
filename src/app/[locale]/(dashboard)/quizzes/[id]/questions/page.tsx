@@ -22,7 +22,8 @@ import {
   CheckSquare,
   Circle,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Sliders
 } from 'lucide-react';
 
 const questionSchema = z.object({
@@ -103,6 +104,18 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
   // Image Upload states
   const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null); // maps to questionId
+
+  // Inline points editing states
+  const [editingPointsQId, setEditingPointsQId] = useState<string | null>(null);
+  const [tempPointsValue, setTempPointsValue] = useState<string>('');
+  const [inlineLoadingQId, setInlineLoadingQId] = useState<string | null>(null);
+
+  // Bulk points states
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkType, setBulkType] = useState<'equal' | 'distribute'>('equal');
+  const [bulkPointsValue, setBulkPointsValue] = useState<number>(5);
+  const [bulkTotalPointsValue, setBulkTotalPointsValue] = useState<number>(100);
+  const [isBulkSubmitLoading, setIsBulkSubmitLoading] = useState(false);
 
   const targetQuestion = questions.find(q => q.id === targetQuestionId);
   const isWeighted = targetQuestion?.question_type === 'weighted';
@@ -325,6 +338,92 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const handleSavePointsInline = async (qId: string) => {
+    const pointsNum = parseInt(tempPointsValue, 10);
+    if (isNaN(pointsNum) || pointsNum < 1) {
+      alert('Points must be a valid integer greater than or equal to 1');
+      return;
+    }
+
+    setInlineLoadingQId(qId);
+    try {
+      const q = questions.find((item) => item.id === qId);
+      if (!q) return;
+
+      await apiClient(`/api/admin/questions/${qId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          points: pointsNum,
+        }),
+      });
+
+      setQuestions((prev) =>
+        prev.map((item) => (item.id === qId ? { ...item, points: pointsNum } : item))
+      );
+      setEditingPointsQId(null);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update points');
+    } finally {
+      setInlineLoadingQId(null);
+    }
+  };
+
+  const handleApplyBulkPoints = async () => {
+    const totalQuestions = questions.length;
+    if (totalQuestions === 0) return;
+
+    if (bulkType === 'distribute' && bulkTotalPointsValue < totalQuestions) {
+      alert(t('distributeErrorLess', { count: totalQuestions }));
+      return;
+    }
+
+    setIsBulkSubmitLoading(true);
+    try {
+      await apiClient(`/api/admin/quizzes/${quizId}/questions/bulk-points`, {
+        method: 'PUT',
+        body: JSON.stringify(
+          bulkType === 'equal'
+            ? { type: 'equal', points: bulkPointsValue }
+            : { type: 'distribute', total_points: bulkTotalPointsValue }
+        ),
+      });
+
+      alert(t('pointsApplied'));
+      setIsBulkModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || t('failedApplyPoints'));
+    } finally {
+      setIsBulkSubmitLoading(false);
+    }
+  };
+
+  const getDistributePreview = () => {
+    const totalQuestions = questions.length;
+    if (totalQuestions === 0) return '';
+    if (bulkTotalPointsValue < totalQuestions) {
+      return t('distributeErrorLess', { count: totalQuestions });
+    }
+    const basePoints = Math.floor(bulkTotalPointsValue / totalQuestions);
+    const remainder = bulkTotalPointsValue % totalQuestions;
+
+    if (remainder === 0) {
+      return t('distributePreviewEven', {
+        count: totalQuestions,
+        points: basePoints,
+        total: bulkTotalPointsValue,
+      });
+    } else {
+      return t('distributePreview', {
+        remainder,
+        high: basePoints + 1,
+        rest: totalQuestions - remainder,
+        low: basePoints,
+        total: bulkTotalPointsValue,
+      });
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Breadcrumb / Back button */}
@@ -344,13 +443,29 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       {/* Control bar */}
       <div className="flex justify-between items-center">
         <p className="text-slate-400 text-sm">{t('totalQuestions', { count: questions.length })}</p>
-        <button
-          onClick={openCreateQModal}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 active:scale-[0.98] transition"
-        >
-          <Plus className="h-4 w-4" />
-          <span>{t('addQuestion')}</span>
-        </button>
+        <div className="flex gap-2">
+          {questions.length > 0 && (
+            <button
+              onClick={() => {
+                setBulkType('equal');
+                setBulkPointsValue(5);
+                setBulkTotalPointsValue(100);
+                setIsBulkModalOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+            >
+              <Sliders className="h-4 w-4" />
+              <span>{t('managePoints')}</span>
+            </button>
+          )}
+          <button
+            onClick={openCreateQModal}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 active:scale-[0.98] transition"
+          >
+            <Plus className="h-4 w-4" />
+            <span>{t('addQuestion')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Error state */}
@@ -388,12 +503,56 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                       </span>
                       <div>
                         <h3 className="font-semibold text-white text-sm md:text-base pr-4 line-clamp-1">{q.question_text}</h3>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
                           <span className="capitalize">
                             {q.question_type === 'weighted' ? t('weightedChoice') : (q.question_type === 'multiple' ? t('multipleChoice') : t('singleChoice'))}
                           </span>
                           <span>•</span>
-                          <span>{q.points} {t('points').toLowerCase()}</span>
+                          {editingPointsQId === q.id ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-14 rounded-lg border border-slate-700 bg-slate-950 px-2 py-0.5 text-center text-xs font-semibold text-white focus:border-blue-500 focus:outline-none"
+                                value={tempPointsValue}
+                                onChange={(e) => setTempPointsValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSavePointsInline(q.id);
+                                  if (e.key === 'Escape') setEditingPointsQId(null);
+                                }}
+                                autoFocus
+                              />
+                              {inlineLoadingQId === q.id ? (
+                                <div className="h-3.5 w-3.5 animate-spin rounded-full border border-blue-500/20 border-t-blue-500" />
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleSavePointsInline(q.id)}
+                                    className="rounded p-0.5 text-green-400 hover:bg-slate-800 transition"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingPointsQId(null)}
+                                    className="rounded p-0.5 text-rose-400 hover:bg-slate-800 transition"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span 
+                              onClick={() => {
+                                setEditingPointsQId(q.id);
+                                setTempPointsValue(q.points.toString());
+                              }}
+                              className="cursor-pointer border-b border-dashed border-slate-500 hover:text-white hover:border-white transition font-medium"
+                              title="Click to edit points inline"
+                            >
+                              {q.points} {t('points').toLowerCase()}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -771,6 +930,98 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- BULK POINTS FORM MODAL --- */}
+      {isBulkModalOpen && (
+        <div 
+          onClick={() => setIsBulkModalOpen(false)}
+          className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-[95%] max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">{t('bulkPointsTitle')}</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{t('bulkPointsSub')}</p>
+              </div>
+              <button onClick={() => setIsBulkModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+                <button
+                  type="button"
+                  onClick={() => setBulkType('equal')}
+                  className={`flex-1 rounded-lg py-2 text-center text-xs font-semibold transition ${bulkType === 'equal' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  {t('equalPoints')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkType('distribute')}
+                  className={`flex-1 rounded-lg py-2 text-center text-xs font-semibold transition ${bulkType === 'distribute' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  {t('distributePoints')}
+                </button>
+              </div>
+
+              {bulkType === 'equal' ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">{t('pointsPerQuestion')}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bulkPointsValue}
+                    onChange={(e) => setBulkPointsValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-300">{t('targetTotalPoints')}</label>
+                    <input
+                      type="number"
+                      min={questions.length}
+                      value={bulkTotalPointsValue}
+                      onChange={(e) => setBulkTotalPointsValue(Math.max(questions.length, parseInt(e.target.value, 10) || questions.length))}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 p-3.5 text-xs text-blue-400 flex gap-2">
+                    <Sparkles className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{getDistributePreview()}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
+                >
+                  {tc('cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyBulkPoints}
+                  disabled={isBulkSubmitLoading}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-500 disabled:opacity-50 transition"
+                >
+                  {isBulkSubmitLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
+                  <span>{t('apply')}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

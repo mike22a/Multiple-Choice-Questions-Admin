@@ -370,6 +370,19 @@
     "invalidQuestionText": "Teks pertanyaan wajib diisi",
     "invalidOptionText": "Teks pilihan wajib diisi",
     "pointsMin": "Poin minimal 0",
-    "orderNumMin": "Urutan minimal 1"
+    "orderNumMin": "Urutan minimal 1",
+    "managePoints": "Atur Bobot Poin",
+    "equalPoints": "Set Semua Poin Sama",
+    "distributePoints": "Bagi Rata Target Poin",
+    "apply": "Terapkan",
+    "pointsApplied": "Poin berhasil diterapkan",
+    "failedApplyPoints": "Gagal menerapkan pengaturan poin",
+    "bulkPointsTitle": "Pengaturan Poin Massal",
+    "bulkPointsSub": "Konfigurasikan bobot/poin untuk seluruh soal aktif di kuis ini.",
+    "pointsPerQuestion": "Poin per Soal",
+    "targetTotalPoints": "Total Target Poin",
+    "distributePreview": "{remainder} soal akan mendapatkan {high} poin, dan {rest} soal akan mendapatkan {low} poin (Total: {total} poin).",
+    "distributePreviewEven": "Seluruh {count} soal akan mendapatkan masing-masing {points} poin (Total: {total} poin).",
+    "distributeErrorLess": "Total poin minimal harus sama dengan jumlah soal ({count})"
   }
 }
