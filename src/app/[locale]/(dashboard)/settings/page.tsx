@@ -48,9 +48,18 @@ export default function SettingsPage() {
   const [trashData, setTrashData] = useState<{ quizzes: any[]; questions: any[] }>({ quizzes: [], questions: [] });
   const [isTrashLoading, setIsTrashLoading] = useState(false);
   const [trashSubTab, setTrashSubTab] = useState<'quizzes' | 'questions'>('quizzes');
+  const [selectedQuizIds, setSelectedQuizIds] = useState<string[]>([]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedQuizIds([]);
+    setSelectedQuestionIds([]);
+  }, [trashSubTab]);
 
   const loadTrashData = async () => {
     setIsTrashLoading(true);
+    setSelectedQuizIds([]);
+    setSelectedQuestionIds([]);
     try {
       const res = await apiClient('/api/admin/trash');
       const data = res?.data || res;
@@ -128,7 +137,9 @@ export default function SettingsPage() {
   const handleDeleteForever = async (type: 'quiz' | 'question', id: string, name: string) => {
     const result = await Swal.fire({
       title: tSet('deleteForeverTitle') || 'Delete Permanently?',
-      text: (tSet('deleteForeverConfirm') || 'Are you sure you want to permanently delete "{name}"? This action CANNOT be undone.').replace('{name}', name),
+      text: type === 'quiz'
+        ? `Apakah Anda yakin ingin menghapus "${name}" secara permanen beserta seluruh riwayat pengerjaannya? Tindakan ini TIDAK dapat dibatalkan.`
+        : `Apakah Anda yakin ingin menghapus "${name}" secara permanen beserta seluruh riwayat jawabannya? Tindakan ini TIDAK dapat dibatalkan.`,
       icon: 'warning',
       showCancelButton: true,
       background: '#0f172a',
@@ -152,6 +163,88 @@ export default function SettingsPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type, action: 'delete', id }),
+        });
+        showSwalAlert(tc('success') || 'Success', tSet('deleteForeverSuccess') || 'Content deleted permanently', 'success');
+        loadTrashData();
+      } catch (err: any) {
+        showSwalAlert(tc('error') || 'Error', err.message || 'Failed to delete content permanently', 'error');
+      }
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    const ids = trashSubTab === 'quizzes' ? selectedQuizIds : selectedQuestionIds;
+    if (ids.length === 0) return;
+
+    const result = await Swal.fire({
+      title: tSet('restoreTitle') || 'Restore Content?',
+      text: trashSubTab === 'quizzes'
+        ? `Apakah Anda yakin ingin memulihkan ${ids.length} kuis?`
+        : `Apakah Anda yakin ingin memulihkan ${ids.length} soal?`,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#475569',
+      confirmButtonText: tc('confirm') || 'Confirm',
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await apiClient('/api/admin/trash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: trashSubTab, action: 'restore', ids }),
+        });
+        showSwalAlert(tc('success') || 'Success', tSet('restoreSuccess') || 'Content restored successfully', 'success');
+        loadTrashData();
+      } catch (err: any) {
+        showSwalAlert(tc('error') || 'Error', err.message || 'Failed to restore content', 'error');
+      }
+    }
+  };
+
+  const handleBulkDeleteForever = async () => {
+    const ids = trashSubTab === 'quizzes' ? selectedQuizIds : selectedQuestionIds;
+    if (ids.length === 0) return;
+
+    const result = await Swal.fire({
+      title: tSet('deleteForeverTitle') || 'Delete Permanently?',
+      text: trashSubTab === 'quizzes'
+        ? `Apakah Anda yakin ingin menghapus ${ids.length} kuis secara permanen beserta seluruh riwayat pengerjaannya? Tindakan ini TIDAK dapat dibatalkan.`
+        : `Apakah Anda yakin ingin menghapus ${ids.length} soal secara permanen beserta seluruh riwayat jawabannya? Tindakan ini TIDAK dapat dibatalkan.`,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#475569',
+      confirmButtonText: tSet('deleteForeverBtn') || 'Delete Permanently',
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await apiClient('/api/admin/trash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: trashSubTab, action: 'delete', ids }),
         });
         showSwalAlert(tc('success') || 'Success', tSet('deleteForeverSuccess') || 'Content deleted permanently', 'success');
         loadTrashData();
@@ -403,6 +496,31 @@ export default function SettingsPage() {
               </button>
             </div>
 
+            {((trashSubTab === 'quizzes' && selectedQuizIds.length > 0) ||
+              (trashSubTab === 'questions' && selectedQuestionIds.length > 0)) && (
+              <div className="flex items-center gap-3 bg-blue-900/10 border border-blue-500/20 rounded-xl p-4 animate-fadeIn">
+                <span className="text-xs text-blue-400 font-semibold">
+                  {trashSubTab === 'quizzes' ? selectedQuizIds.length : selectedQuestionIds.length} {trashSubTab === 'quizzes' ? 'Kuis' : 'Soal'} terpilih
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={handleBulkRestore}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>{tSet('restoreBtn') || 'Restore'}</span>
+                  </button>
+                  <button
+                    onClick={handleBulkDeleteForever}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg border border-rose-500/20 transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>{tSet('deleteForeverBtnShort') || 'Delete Forever'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {isTrashLoading ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-3">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
@@ -419,9 +537,23 @@ export default function SettingsPage() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-slate-900 text-xs font-semibold uppercase text-slate-500">
-                        <th className="pb-3 pr-4">{tSet('quizTitleCol') || 'Quiz Title'}</th>
-                        <th className="pb-3 px-4">{tSet('questionsCountCol') || 'Questions'}</th>
-                        <th className="pb-3 px-4">{tSet('attemptsCountCol') || 'Attempts'}</th>
+                        <th className="pb-3 pr-4 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={trashData.quizzes.length > 0 && selectedQuizIds.length === trashData.quizzes.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedQuizIds(trashData.quizzes.map(q => q.id));
+                              } else {
+                                setSelectedQuizIds([]);
+                              }
+                            }}
+                            className="rounded border-slate-700 bg-slate-900/50 text-blue-600 focus:ring-blue-500/30 w-4 h-4 cursor-pointer"
+                          />
+                        </th>
+                        <th className="pb-3 px-4">{tSet('quizTitleCol') || 'Quiz Title'}</th>
+                        <th className="pb-3 px-4 text-center">{tSet('questionsCountCol') || 'Questions'}</th>
+                        <th className="pb-3 px-4 text-center">{tSet('attemptsCountCol') || 'Attempts'}</th>
                         <th className="pb-3 px-4">{tSet('deletedAtCol') || 'Deleted At'}</th>
                         <th className="pb-3 pl-4 text-right">{tSet('actionsCol') || 'Actions'}</th>
                       </tr>
@@ -429,9 +561,23 @@ export default function SettingsPage() {
                     <tbody className="divide-y divide-slate-900/40 text-slate-300">
                       {trashData.quizzes.map((quiz) => (
                         <tr key={quiz.id} className="hover:bg-slate-950/20 transition-colors">
-                          <td className="py-4 pr-4 font-bold text-white max-w-xs truncate">{quiz.title}</td>
-                          <td className="py-4 px-4 text-slate-400 font-mono">{quiz.question_count}</td>
-                          <td className="py-4 px-4">
+                          <td className="py-4 pr-4 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedQuizIds.includes(quiz.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedQuizIds([...selectedQuizIds, quiz.id]);
+                                } else {
+                                  setSelectedQuizIds(selectedQuizIds.filter(id => id !== quiz.id));
+                                }
+                              }}
+                              className="rounded border-slate-700 bg-slate-900/50 text-blue-600 focus:ring-blue-500/30 w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-4 px-4 font-bold text-white max-w-xs truncate">{quiz.title}</td>
+                          <td className="py-4 px-4 text-slate-400 font-mono text-center">{quiz.question_count}</td>
+                          <td className="py-4 px-4 text-center">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-mono font-semibold ${quiz.attempt_count > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
                               {quiz.attempt_count}
                             </span>
@@ -475,9 +621,23 @@ export default function SettingsPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-slate-900 text-xs font-semibold uppercase text-slate-500">
-                      <th className="pb-3 pr-4">{tSet('questionTextCol') || 'Question Text'}</th>
+                      <th className="pb-3 pr-4 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={trashData.questions.length > 0 && selectedQuestionIds.length === trashData.questions.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedQuestionIds(trashData.questions.map(q => q.id));
+                            } else {
+                              setSelectedQuestionIds([]);
+                            }
+                          }}
+                          className="rounded border-slate-700 bg-slate-900/50 text-blue-600 focus:ring-blue-500/30 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
+                      <th className="pb-3 px-4">{tSet('questionTextCol') || 'Question Text'}</th>
                       <th className="pb-3 px-4">{tSet('quizCol') || 'Quiz'}</th>
-                      <th className="pb-3 px-4">{tSet('responsesCountCol') || 'Responses'}</th>
+                      <th className="pb-3 px-4 text-center">{tSet('responsesCountCol') || 'Responses'}</th>
                       <th className="pb-3 px-4">{tSet('deletedAtCol') || 'Deleted At'}</th>
                       <th className="pb-3 pl-4 text-right">{tSet('actionsCol') || 'Actions'}</th>
                     </tr>
@@ -485,9 +645,23 @@ export default function SettingsPage() {
                   <tbody className="divide-y divide-slate-900/40 text-slate-300">
                     {trashData.questions.map((q) => (
                       <tr key={q.id} className="hover:bg-slate-950/20 transition-colors">
-                        <td className="py-4 pr-4 font-bold text-white max-w-sm truncate">{q.question_text}</td>
+                        <td className="py-4 pr-4 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedQuestionIds.includes(q.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedQuestionIds([...selectedQuestionIds, q.id]);
+                              } else {
+                                setSelectedQuestionIds(selectedQuestionIds.filter(id => id !== q.id));
+                              }
+                            }}
+                            className="rounded border-slate-700 bg-slate-900/50 text-blue-600 focus:ring-blue-500/30 w-4 h-4 cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-4 px-4 font-bold text-white max-w-sm truncate">{q.question_text}</td>
                         <td className="py-4 px-4 text-slate-400 truncate max-w-xs">{q.quiz_title}</td>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-4 text-center">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-mono font-semibold ${q.response_count > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
                             {q.response_count}
                           </span>
