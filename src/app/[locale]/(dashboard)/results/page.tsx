@@ -433,7 +433,7 @@ export default function ResultsPage() {
       {selectedAttemptId && (
         <div 
           onClick={() => setSelectedAttemptId(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}

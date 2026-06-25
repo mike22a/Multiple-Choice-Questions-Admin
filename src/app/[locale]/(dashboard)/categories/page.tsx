@@ -619,7 +619,7 @@ export default function CategoriesPage() {
       {isModalOpen && (
         <div 
           onClick={() => setIsModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -716,7 +716,7 @@ export default function CategoriesPage() {
             setImportPreview([]);
             setImportErrors([]);
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
