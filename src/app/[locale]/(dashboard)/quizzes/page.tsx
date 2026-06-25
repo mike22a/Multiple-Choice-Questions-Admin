@@ -478,41 +478,44 @@ export default function QuizzesPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">{tQuiz('title')}</h1>
-          <p className="mt-2 text-slate-400">{tQuiz('subtitle')}</p>
+      {/* Sticky Header wrapper */}
+      <div className="sticky top-16 z-30 bg-slate-950/90 -mx-6 px-6 py-5 md:-mx-8 md:px-8 -mt-6 lg:-mt-8 border-b border-slate-900 backdrop-blur-md flex flex-col gap-4">
+        {/* Header section */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">{tQuiz('title')}</h1>
+            <p className="mt-2 text-slate-400 text-xs sm:text-sm">{tQuiz('subtitle')}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+            >
+              <Upload className="h-4 w-4" />
+              <span>{tQuiz('importCsv')}</span>
+            </button>
+            
+            <button
+              onClick={openCreateModal}
+              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 hover:brightness-110 active:scale-[0.98] transition"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{tQuiz('addQuiz')}</span>
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
-          >
-            <Upload className="h-4 w-4" />
-            <span>{tQuiz('importCsv')}</span>
-          </button>
-          
-          <button
-            onClick={openCreateModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 hover:brightness-110 active:scale-[0.98] transition"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{tQuiz('addQuiz')}</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Filter and search bar */}
-      <div className="flex max-w-md items-center gap-2 rounded-xl border border-slate-900 bg-slate-900/30 px-3.5 py-2.5 backdrop-blur-xl">
-        <Search className="h-5 w-5 text-slate-500 shrink-0" />
-        <input
-          type="text"
-          placeholder={tQuiz('searchPlaceholder')}
-          value={search}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
-        />
+        {/* Filter and search bar */}
+        <div className="flex max-w-md items-center gap-2 rounded-xl border border-slate-900 bg-slate-900/30 px-3.5 py-2.5 backdrop-blur-xl">
+          <Search className="h-5 w-5 text-slate-500 shrink-0" />
+          <input
+            type="text"
+            placeholder={tQuiz('searchPlaceholder')}
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
+          />
+        </div>
       </div>
 
       {/* Quiz List Grid */}

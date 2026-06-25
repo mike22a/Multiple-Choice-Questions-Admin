@@ -559,45 +559,48 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="space-y-8">
-      {/* Breadcrumb / Back button */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/quizzes"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white transition"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{t('title')}</span>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">{quizTitle}</h1>
-        </div>
-      </div>
-
-      {/* Control bar */}
-      <div className="flex justify-between items-center">
-        <p className="text-slate-400 text-sm">{t('totalQuestions', { count: questions.length })}</p>
-        <div className="flex gap-2">
-          {questions.length > 0 && (
-            <button
-              onClick={() => {
-                setBulkType('equal');
-                setBulkPointsValue(5);
-                setBulkTotalPointsValue(100);
-                setIsBulkModalOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
-            >
-              <Sliders className="h-4 w-4" />
-              <span>{t('managePoints')}</span>
-            </button>
-          )}
-          <button
-            onClick={openCreateQModal}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 active:scale-[0.98] transition"
+      {/* Sticky Header wrapper */}
+      <div className="sticky top-16 z-30 bg-slate-950/90 -mx-6 px-6 py-5 md:-mx-8 md:px-8 -mt-6 lg:-mt-8 border-b border-slate-900 backdrop-blur-md flex flex-col gap-4">
+        {/* Breadcrumb / Back button */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/quizzes"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white transition"
           >
-            <Plus className="h-4 w-4" />
-            <span>{t('addQuestion')}</span>
-          </button>
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{t('title')}</span>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">{quizTitle}</h1>
+          </div>
+        </div>
+
+        {/* Control bar */}
+        <div className="flex justify-between items-center">
+          <p className="text-slate-400 text-sm">{t('totalQuestions', { count: questions.length })}</p>
+          <div className="flex gap-2">
+            {questions.length > 0 && (
+              <button
+                onClick={() => {
+                  setBulkType('equal');
+                  setBulkPointsValue(5);
+                  setBulkTotalPointsValue(100);
+                  setIsBulkModalOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+              >
+                <Sliders className="h-4 w-4" />
+                <span>{t('managePoints')}</span>
+              </button>
+            )}
+            <button
+              onClick={openCreateQModal}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 active:scale-[0.98] transition"
+            >
+              <Plus className="h-4 w-4" />
+              <span>{t('addQuestion')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
