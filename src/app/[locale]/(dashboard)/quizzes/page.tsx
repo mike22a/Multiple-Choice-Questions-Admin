@@ -146,16 +146,42 @@ export default function QuizzesPage() {
     setImportPreview([]);
 
     const text = await file.text();
-    const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return;
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
     const parsedPreview = [];
+
     for (let i = 1; i < Math.min(lines.length, 6); i++) {
-      const parts = lines[i].split(',').map(p => p.replace(/^["']|["']$/g, ''));
+      const line = lines[i];
+      const parts: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let charIdx = 0; charIdx < line.length; charIdx++) {
+        const char = line[charIdx];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          parts.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      parts.push(current.trim().replace(/^["']|["']$/g, ''));
+
+      const getVal = (headerName: string) => {
+        const idx = headers.indexOf(headerName);
+        return idx !== -1 ? parts[idx] : '';
+      };
+
       parsedPreview.push({
-        title: parts[0] || '',
-        description: parts[1] || '',
-        duration: parts[2] || '',
-        pass_score: parts[3] || '',
-        category_name: parts[4] || '',
+        title: getVal('quiz_title'),
+        description: getVal('quiz_description'),
+        duration: getVal('duration_minutes'),
+        pass_score: getVal('pass_score'),
+        category_name: getVal('category_name'),
       });
     }
     setImportPreview(parsedPreview);
