@@ -556,7 +556,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       {isQModalOpen && (
         <div 
           onClick={() => setIsQModalOpen(false)}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] modal-backdrop flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -706,7 +706,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       {isOptModalOpen && (
         <div 
           onClick={() => setIsOptModalOpen(false)}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] modal-backdrop flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
