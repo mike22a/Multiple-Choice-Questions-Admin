@@ -112,11 +112,11 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
       </div>
 
       {/* Sidebar Navigation */}
-      <aside className={`fixed top-0 bottom-0 left-0 z-50 border-r border-slate-900 bg-slate-950/80 backdrop-blur-xl transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`hidden lg:block fixed top-0 bottom-0 left-0 z-50 border-r border-slate-900 bg-slate-950/80 backdrop-blur-xl transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         {/* Floating absolute collapse button for desktop */}
         <button 
           onClick={handleToggleSidebar} 
-          className="hidden lg:flex absolute top-5 -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-white hover:scale-110 shadow-lg shadow-black/50 transition-all duration-200"
+          className="absolute top-5 -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-white hover:scale-110 shadow-lg shadow-black/50 transition-all duration-200"
           title={isSidebarCollapsed ? tc('expand') : tc('collapse')}
         >
           {isSidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
@@ -131,9 +131,6 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
               {tc('title')}
             </span>
           </Link>
-          <button onClick={() => setIsSidebarOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden">
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         <nav className="space-y-1.5 px-4 py-6">
@@ -174,12 +171,15 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
       <div className={`transition-[padding-left] duration-300 w-full min-w-0 ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Header bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950/70 px-6 backdrop-blur-md">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+          {/* Logo for mobile view */}
+          <Link href="/" className="flex items-center gap-2 lg:hidden">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10">
+              <span className="font-bold text-sm">M</span>
+            </div>
+            <span className="font-bold tracking-tight text-white text-sm">
+              {tc('title')}
+            </span>
+          </Link>
 
           {/* Right menu tools */}
           <div className="ml-auto flex items-center gap-4">
@@ -231,10 +231,29 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
         </header>
 
         {/* Dashboard Content Area */}
-        <main className="min-h-[calc(100vh-4rem)] p-6 lg:p-8 w-full min-w-0">
+        <main className="min-h-[calc(100vh-4rem)] px-6 pt-6 pb-24 lg:p-8 w-full min-w-0">
           {children}
         </main>
       </div>
+
+      {/* Bottom Navigation for Mobile */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-slate-900 bg-slate-950/80 backdrop-blur-xl flex justify-around items-center h-16 px-2 shadow-2xl shadow-black/80">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center flex-1 py-1 min-w-0 transition-all duration-200 ${isActive ? 'text-blue-500' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
+              <span className="text-[9px] font-medium mt-1 truncate w-full text-center">
+                {item.name}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
