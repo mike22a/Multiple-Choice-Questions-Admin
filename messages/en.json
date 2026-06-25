@@ -163,6 +163,7 @@
     "failedImport": "Import failed.",
     "failedSave": "Failed to save quiz",
     "deleteConfirm": "Are you sure you want to delete this quiz?",
+    "deleteConfirmTitle": "Delete Quiz",
     "failedDelete": "Failed to delete quiz",
     "failedTogglePublish": "Failed to update publication status",
     "failedToggleSafeMode": "Failed to update safe mode status",

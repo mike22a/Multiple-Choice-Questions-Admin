@@ -163,6 +163,7 @@
     "failedImport": "Impor gagal.",
     "failedSave": "Gagal menyimpan kuis",
     "deleteConfirm": "Apakah Anda yakin ingin menghapus kuis ini?",
+    "deleteConfirmTitle": "Hapus Kuis",
     "failedDelete": "Gagal menghapus kuis",
     "failedTogglePublish": "Gagal memperbarui status publikasi",
     "failedToggleSafeMode": "Gagal memperbarui status mode aman",

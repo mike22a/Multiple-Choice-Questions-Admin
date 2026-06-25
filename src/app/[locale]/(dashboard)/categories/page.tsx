@@ -258,7 +258,7 @@ export default function CategoriesPage() {
       ? tCat('deleteWithChildrenAlert', { name: category.name })
       : tCat('deleteCategoryAlert', { name: category.name });
 
-    const result = await showSwalConfirm(tCat('deleteConfirmTitle') || tc('delete') || 'Delete', message);
+    const result = await showSwalConfirm(tCat('deleteCategory') || tc('delete') || 'Delete', message);
     if (!result.isConfirmed) return;
 
     try {
