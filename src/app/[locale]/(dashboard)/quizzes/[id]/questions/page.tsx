@@ -117,6 +117,9 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   const [bulkTotalPointsValue, setBulkTotalPointsValue] = useState<number>(100);
   const [isBulkSubmitLoading, setIsBulkSubmitLoading] = useState(false);
 
+  // Option toggle loading state
+  const [loadingOptionId, setLoadingOptionId] = useState<string | null>(null);
+
   const targetQuestion = questions.find(q => q.id === targetQuestionId);
   const isWeighted = targetQuestion?.question_type === 'weighted';
 
@@ -269,10 +272,13 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     setIsOptSubmitLoading(true);
     const targetQuestion = questions.find(q => q.id === targetQuestionId);
     const isWeighted = targetQuestion?.question_type === 'weighted';
-    const payload = {
-      ...data,
+    const payload: any = {
+      option_text: data.option_text,
       is_correct: isWeighted ? (data.points || 0) > 0 : data.is_correct,
     };
+    if (isWeighted) {
+      payload.points = data.points || 0;
+    }
     try {
       if (editingOption) {
         await apiClient(`/api/admin/options/${editingOption.id}`, {
@@ -335,6 +341,81 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       loadData();
     } catch (err: any) {
       alert(err?.message || 'Failed to delete image');
+    }
+  };
+
+  const handleSetOptionCorrectSingle = async (questionId: string, optionId: string) => {
+    const q = questions.find((item) => item.id === questionId);
+    if (!q || !q.options) return;
+
+    setLoadingOptionId(optionId);
+    try {
+      const currentCorrectOpt = q.options.find((opt) => opt.is_correct);
+
+      await apiClient(`/api/admin/options/${optionId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_correct: true }),
+      });
+
+      if (currentCorrectOpt && currentCorrectOpt.id !== optionId) {
+        await apiClient(`/api/admin/options/${currentCorrectOpt.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_correct: false }),
+        });
+      }
+
+      setQuestions((prev) =>
+        prev.map((item) =>
+          item.id === questionId
+            ? {
+                ...item,
+                options: item.options?.map((o) => ({
+                  ...o,
+                  is_correct: o.id === optionId,
+                })),
+              }
+            : item
+        )
+      );
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update correct option');
+    } finally {
+      setLoadingOptionId(null);
+    }
+  };
+
+  const handleToggleOptionCorrectMultiple = async (questionId: string, optionId: string) => {
+    const q = questions.find((item) => item.id === questionId);
+    if (!q || !q.options) return;
+
+    const opt = q.options.find((o) => o.id === optionId);
+    if (!opt) return;
+
+    const nextCorrect = !opt.is_correct;
+    setLoadingOptionId(optionId);
+
+    try {
+      await apiClient(`/api/admin/options/${optionId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_correct: nextCorrect }),
+      });
+
+      setQuestions((prev) =>
+        prev.map((item) =>
+          item.id === questionId
+            ? {
+                ...item,
+                options: item.options?.map((o) =>
+                  o.id === optionId ? { ...o, is_correct: nextCorrect } : o
+                ),
+              }
+            : item
+        )
+      );
+    } catch (err: any) {
+      alert(err?.message || 'Failed to toggle option correctness');
+    } finally {
+      setLoadingOptionId(null);
     }
   };
 
@@ -649,14 +730,33 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                                       <span className="flex h-6 px-2 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 text-xs font-mono font-bold">
                                         {opt.points || 0} pt{opt.points === 1 ? '' : 's'}
                                       </span>
-                                    ) : opt.is_correct ? (
-                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
-                                        <Check className="h-3 w-3" />
-                                      </span>
-                                    ) : q.question_type === 'single' ? (
-                                      <Circle className="h-5 w-5 shrink-0 text-slate-600" />
                                     ) : (
-                                      <CheckSquare className="h-5 w-5 shrink-0 text-slate-600" />
+                                      <button
+                                        type="button"
+                                        disabled={loadingOptionId !== null}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (q.question_type === 'single') {
+                                            handleSetOptionCorrectSingle(q.id, opt.id);
+                                          } else {
+                                            handleToggleOptionCorrectMultiple(q.id, opt.id);
+                                          }
+                                        }}
+                                        className="focus:outline-none shrink-0 disabled:opacity-50 transition"
+                                        title={q.question_type === 'single' ? 'Set as correct answer' : 'Toggle correctness'}
+                                      >
+                                        {loadingOptionId === opt.id ? (
+                                          <div className="h-4 w-4 animate-spin rounded-full border border-blue-500/20 border-t-blue-500" />
+                                        ) : opt.is_correct ? (
+                                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow">
+                                            <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                          </span>
+                                        ) : q.question_type === 'single' ? (
+                                          <Circle className="h-5 w-5 text-slate-600 hover:text-emerald-500 transition" />
+                                        ) : (
+                                          <CheckSquare className="h-5 w-5 text-slate-600 hover:text-emerald-500 transition" />
+                                        )}
+                                      </button>
                                     )}
                                     <span className={`text-sm ${opt.is_correct && q.question_type !== 'weighted' ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>
                                       {opt.option_text}
