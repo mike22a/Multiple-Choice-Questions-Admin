@@ -26,17 +26,18 @@ import {
   Settings2,
   Upload,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FolderTree
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const quizSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
+  title: z.string().min(3, 'titleMin'),
   description: z.string().optional(),
-  category_id: z.string().uuid('Invalid category format').optional().nullable(),
-  duration_minutes: z.coerce.number().min(1, 'Duration must be at least 1 minute'),
-  max_attempts: z.coerce.number().min(1, 'Max attempts must be at least 1'),
-  pass_score: z.coerce.number().min(1).max(100, 'Pass score must be between 1 and 100'),
+  category_id: z.string().uuid('invalidCategory').optional().nullable(),
+  duration_minutes: z.coerce.number().min(1, 'durationMin'),
+  max_attempts: z.coerce.number().min(1, 'maxAttemptsMin'),
+  pass_score: z.coerce.number().min(0, 'passScoreMinMax').max(100, 'passScoreMinMax'),
   randomize_questions: z.boolean().default(false),
   randomize_options: z.boolean().default(false),
   show_result_immediately: z.boolean().default(true),
@@ -53,6 +54,8 @@ interface Category {
   name: string;
   depth: number;
   is_system: boolean;
+  parent_id: string | null;
+  path: string;
 }
 
 interface Quiz {
@@ -80,6 +83,7 @@ interface Quiz {
 export default function QuizzesPage() {
   const router = useRouter();
   const tc = useTranslations('Common');
+  const tQuiz = useTranslations('Quizzes');
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -116,6 +120,63 @@ export default function QuizzesPage() {
     resolver: zodResolver(quizSchema),
   });
 
+  // Quick Category Modal states
+  const [isQuickCategoryModalOpen, setIsQuickCategoryModalOpen] = useState(false);
+  const [quickCategoryQuiz, setQuickCategoryQuiz] = useState<Quiz | null>(null);
+  const [selectedQuickCategoryId, setSelectedQuickCategoryId] = useState<string | null>(null);
+
+  const openQuickCategoryModal = (quiz: Quiz) => {
+    setQuickCategoryQuiz(quiz);
+    setSelectedQuickCategoryId(quiz.category_id);
+    setIsQuickCategoryModalOpen(true);
+  };
+
+  const handleQuickCategorySave = async () => {
+    if (!quickCategoryQuiz) return;
+    try {
+      setIsSubmitLoading(true);
+      await apiClient(`/api/admin/quizzes/${quickCategoryQuiz.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: quickCategoryQuiz.title,
+          description: quickCategoryQuiz.description,
+          duration_minutes: quickCategoryQuiz.duration_minutes,
+          max_attempts: quickCategoryQuiz.max_attempts,
+          pass_score: quickCategoryQuiz.pass_score,
+          is_published: quickCategoryQuiz.is_published,
+          safe_mode: quickCategoryQuiz.safe_mode,
+          randomize_questions: quickCategoryQuiz.randomize_questions,
+          randomize_options: quickCategoryQuiz.randomize_options,
+          show_result_immediately: quickCategoryQuiz.show_result_immediately,
+          available_from: quickCategoryQuiz.available_from,
+          available_until: quickCategoryQuiz.available_until,
+          timezone: quickCategoryQuiz.timezone,
+          category_id: selectedQuickCategoryId,
+        }),
+      });
+      setIsQuickCategoryModalOpen(false);
+      setQuickCategoryQuiz(null);
+      loadQuizzes(currentPage, search);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update category');
+    } finally {
+      setIsSubmitLoading(false);
+    }
+  };
+
+  const getCategoryPath = (categoryId: string | null): string => {
+    if (!categoryId) return '';
+    const parts: string[] = [];
+    let current = categories.find((c) => c.id === categoryId);
+    while (current) {
+      parts.unshift(current.name);
+      const parentId = current.parent_id;
+      current = parentId ? categories.find((c) => c.id === parentId) : undefined;
+    }
+    return parts.join(' \u203A ');
+  };
+
   const loadQuizzes = async (page = 1, searchQuery = '') => {
     setIsLoading(true);
     try {
@@ -132,7 +193,7 @@ export default function QuizzesPage() {
       setTotalQuizzes(data?.pagination?.total || 0);
       setTotalPages(Math.ceil((data?.pagination?.total || 0) / itemsPerPage));
     } catch (err: any) {
-      setError(err?.message || 'Failed to load quizzes');
+      setError(err?.message || tQuiz('failedLoad'));
     } finally {
       setIsLoading(false);
     }
@@ -266,7 +327,7 @@ export default function QuizzesPage() {
       setImportPreview([]);
       loadQuizzes();
     } catch (err: any) {
-      setImportErrors([{ error: err.message || 'Import failed.' }]);
+      setImportErrors([{ error: err.message || tQuiz('failedImport') }]);
     } finally {
       setIsImporting(false);
       if (quizFileInputRef.current) quizFileInputRef.current.value = '';
@@ -321,6 +382,7 @@ export default function QuizzesPage() {
         category_id: data.category_id || null,
         available_from: data.available_from ? new Date(data.available_from).toISOString() : null,
         available_until: data.available_until ? new Date(data.available_until).toISOString() : null,
+        is_published: editingQuiz ? editingQuiz.is_published : false,
       };
 
       if (editingQuiz) {
@@ -340,19 +402,19 @@ export default function QuizzesPage() {
       setIsModalOpen(false);
       loadQuizzes();
     } catch (err: any) {
-      alert(err?.message || 'Failed to save quiz');
+      alert(err?.message || tQuiz('failedSave'));
     } finally {
       setIsSubmitLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this quiz?')) return;
+    if (!confirm(tQuiz('deleteConfirm'))) return;
     try {
       await apiClient(`/api/admin/quizzes/${id}`, { method: 'DELETE' });
       loadQuizzes();
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete quiz');
+      alert(err?.message || tQuiz('failedDelete'));
     }
   };
 
@@ -366,7 +428,7 @@ export default function QuizzesPage() {
       // update state locally
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, is_published: data.is_published } : q));
     } catch (err: any) {
-      alert(err?.message || 'Failed to update publication status');
+      alert(err?.message || tQuiz('failedTogglePublish'));
     }
   };
 
@@ -379,7 +441,7 @@ export default function QuizzesPage() {
       const data = res?.data || res;
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, safe_mode: data.safe_mode } : q));
     } catch (err: any) {
-      alert(err?.message || 'Failed to update safe mode status');
+      alert(err?.message || tQuiz('failedToggleSafeMode'));
     }
   };
 
@@ -419,8 +481,8 @@ export default function QuizzesPage() {
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Quiz Management</h1>
-          <p className="mt-2 text-slate-400">Configure exams, questions, and view candidate enrollment parameters.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">{tQuiz('title')}</h1>
+          <p className="mt-2 text-slate-400">{tQuiz('subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
           <button
@@ -428,7 +490,7 @@ export default function QuizzesPage() {
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition"
           >
             <Upload className="h-4 w-4" />
-            <span>Import CSV</span>
+            <span>{tQuiz('importCsv')}</span>
           </button>
           
           <button
@@ -436,7 +498,7 @@ export default function QuizzesPage() {
             className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 hover:brightness-110 active:scale-[0.98] transition"
           >
             <Plus className="h-4 w-4" />
-            <span>Create Quiz</span>
+            <span>{tQuiz('addQuiz')}</span>
           </button>
         </div>
       </div>
@@ -446,7 +508,7 @@ export default function QuizzesPage() {
         <Search className="h-5 w-5 text-slate-500 shrink-0" />
         <input
           type="text"
-          placeholder="Search quizzes..."
+          placeholder={tQuiz('searchPlaceholder')}
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
@@ -471,120 +533,138 @@ export default function QuizzesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-bold text-white text-lg group-hover:text-blue-400 transition">{quiz.title}</h3>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${quiz.is_published ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
-                      {quiz.is_published ? 'Published' : 'Draft'}
+                      {quiz.is_published ? tQuiz('published') : tQuiz('draft')}
                     </span>
                   </div>
 
                   {/* Category Badge */}
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {quiz.category_id ? (
-                      <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 uppercase tracking-wider">
-                        {categories.find(c => c.id === quiz.category_id)?.name || 'Loading Category...'}
+                  <div className="mt-1.5 flex items-center min-w-0">
+                    <button
+                      onClick={() => openQuickCategoryModal(quiz)}
+                      title={`${getCategoryPath(quiz.category_id) || tQuiz('uncategorized')} - Click to edit category`}
+                      className="group/badge inline-flex items-center gap-1.5 rounded bg-blue-500/10 hover:bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider transition truncate max-w-full text-left"
+                    >
+                      <span className="truncate">
+                        {getCategoryPath(quiz.category_id) || tQuiz('uncategorized')}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Uncategorized
-                      </span>
-                    )}
+                      <Edit className="h-2.5 w-2.5 shrink-0 opacity-40 group-hover/badge:opacity-100 transition-opacity" />
+                    </button>
                   </div>
 
-                  <p className="mt-2 text-xs text-slate-400 line-clamp-2 h-8">{quiz.description || 'No description provided.'}</p>
+                  <p className="mt-2 text-xs text-slate-400 line-clamp-2 h-8">{quiz.description || tQuiz('noDescription')}</p>
 
                   {/* Details list */}
                   <div className="mt-4 grid grid-cols-2 gap-y-3 gap-x-2 border-t border-slate-900/60 pt-4 text-xs">
                     <div>
-                      <span className="text-slate-500">Duration:</span>
-                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.duration_minutes} mins</span>
+                      <span className="text-slate-500">{tQuiz('durationLabel')}:</span>
+                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.duration_minutes} {tQuiz('minutesLabel')}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Pass Score:</span>
+                      <span className="text-slate-500">{tQuiz('passScoreLabel')}:</span>
                       <span className="ml-1.5 font-semibold text-slate-300">{quiz.pass_score}%</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Max Attempts:</span>
+                      <span className="text-slate-500">{tQuiz('maxAttemptsLabel')}:</span>
                       <span className="ml-1.5 font-semibold text-slate-300">{quiz.max_attempts}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Proctoring:</span>
+                      <span className="text-slate-500">{tQuiz('safeMode')}:</span>
                       <span className={`ml-1.5 font-semibold inline-flex items-center gap-1 ${quiz.safe_mode ? 'text-indigo-400' : 'text-slate-500'}`}>
                         {quiz.safe_mode ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                        <span>{quiz.safe_mode ? 'Enabled' : 'Disabled'}</span>
+                        <span>{quiz.safe_mode ? tQuiz('enabledLabel') : tQuiz('disabledLabel')}</span>
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Questions:</span>
+                      <span className="text-slate-500">{tQuiz('totalQuestions')}:</span>
                       <span className="ml-1.5 font-semibold text-slate-300">{quiz.total_questions ?? 0}</span>
                     </div>
                     <div>
-                      <span className="text-slate-500">Total Score:</span>
-                      <span className="ml-1.5 font-semibold text-emerald-400">{quiz.total_points ?? 0} pts</span>
+                      <span className="text-slate-500">{tQuiz('totalPoints')}:</span>
+                      <span className="ml-1.5 font-semibold text-emerald-400">{quiz.total_points ?? 0} {tQuiz('pointsLabel')}</span>
                     </div>
                   </div>
 
                   {/* Dates info */}
                   {(quiz.available_from || quiz.available_until) && (
                     <div className="mt-4 rounded-lg bg-slate-950/40 p-2.5 text-[10px] text-slate-500 border border-slate-900/40">
-                      <p>Available: {quiz.available_from ? format(new Date(quiz.available_from), 'dd MMM yyyy HH:mm') : 'Anytime'} to {quiz.available_until ? format(new Date(quiz.available_until), 'dd MMM yyyy HH:mm') : 'Indefinite'}</p>
+                      <p>{tQuiz('availableRange', {
+                        from: quiz.available_from ? format(new Date(quiz.available_from), 'dd MMM yyyy HH:mm') : tQuiz('anytime'),
+                        until: quiz.available_until ? format(new Date(quiz.available_until), 'dd MMM yyyy HH:mm') : tQuiz('indefinite')
+                      })}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Action buttons footer */}
-                <div className="mt-6 flex items-center justify-between border-t border-slate-900/60 pt-4">
-                  <Link
-                    href={`/quizzes/${quiz.id}/questions`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600/10 border border-blue-500/25 px-3.5 py-2 text-xs font-bold text-blue-400 hover:bg-blue-600 hover:text-white hover:border-transparent transition"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                    <span>Manage Questions</span>
-                  </Link>
-
-                  <div className="flex items-center gap-2">
+                <div className="mt-6 border-t border-slate-900/60 pt-4 space-y-3">
+                  {/* Icon Actions Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     {/* Toggle publish button */}
                     <button
                       onClick={() => togglePublish(quiz)}
-                      title={quiz.is_published ? 'Unpublish' : 'Publish'}
-                      className={`rounded-lg p-2 transition ${quiz.is_published ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
+                      title={quiz.is_published ? tQuiz('unpublish') : tQuiz('publish')}
+                      className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider border transition ${
+                        quiz.is_published 
+                          ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20' 
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                      }`}
                     >
-                      {quiz.is_published ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                      {quiz.is_published ? <ToggleRight className="h-4.5 w-4.5" /> : <ToggleLeft className="h-4.5 w-4.5" />}
+                      <span>{quiz.is_published ? tQuiz('published') : tQuiz('draft')}</span>
                     </button>
 
-                    {/* Toggle safe mode button */}
-                    <button
-                      onClick={() => toggleSafeMode(quiz)}
-                      title="Toggle proctoring safe mode"
-                      className={`rounded-lg p-2 transition ${quiz.safe_mode ? 'text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </button>
+                    {/* Secondary utilities group */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Toggle safe mode button */}
+                      <button
+                        onClick={() => toggleSafeMode(quiz)}
+                        title={tQuiz('toggleSafeModeTitle')}
+                        className={`rounded-lg p-2 border transition ${
+                          quiz.safe_mode 
+                            ? 'border-indigo-500/25 text-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10' 
+                            : 'border-slate-800 text-slate-500 hover:bg-slate-900'
+                        }`}
+                      >
+                        <Settings2 className="h-4 w-4" />
+                      </button>
 
-                    {/* Export CSV link */}
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/${quiz.id}/export`}
-                      title="Export questions CSV"
-                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
-                    >
-                      <FileDown className="h-4 w-4" />
-                    </a>
+                      {/* Export CSV link */}
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/${quiz.id}/export`}
+                        title={tQuiz('exportCsvTitle')}
+                        className="rounded-lg p-2 border border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-white transition"
+                      >
+                        <FileDown className="h-4 w-4" />
+                      </a>
 
-                    {/* Edit button */}
-                    <button
-                      onClick={() => openEditModal(quiz)}
-                      title="Edit metadata"
-                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
+                      {/* Edit button */}
+                      <button
+                        onClick={() => openEditModal(quiz)}
+                        title={tQuiz('editMetadataTitle')}
+                        className="rounded-lg p-2 border border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-white transition"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
 
-                    {/* Delete button */}
-                    <button
-                      onClick={() => handleDelete(quiz.id)}
-                      title="Delete Quiz"
-                      className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10 transition"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </button>
+                      {/* Delete button */}
+                      <button
+                        onClick={() => handleDelete(quiz.id)}
+                        title={tQuiz('deleteQuizTitle')}
+                        className="rounded-lg p-2 border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Primary Action: Manage Questions */}
+                  <Link
+                    href={`/quizzes/${quiz.id}/questions`}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500 active:scale-[0.98] transition"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span>{tQuiz('editQuestions')}</span>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -594,11 +674,7 @@ export default function QuizzesPage() {
           {totalQuizzes > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
               <div>
-                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-                <span className="font-semibold text-white">
-                  {Math.min(currentPage * itemsPerPage, totalQuizzes)}
-                </span>{' '}
-                of <span className="font-semibold text-white">{totalQuizzes}</span> quizzes
+                {tc('showingRange', { start: (currentPage - 1) * itemsPerPage + 1, end: Math.min(currentPage * itemsPerPage, totalQuizzes), total: totalQuizzes })}
               </div>
               
               {totalPages > 1 && (
@@ -608,7 +684,7 @@ export default function QuizzesPage() {
                     disabled={currentPage === 1}
                     className="rounded-xl border border-slate-900 bg-slate-900/40 px-3 py-1.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    Previous
+                    {tc('previous')}
                   </button>
                   
                   {renderPageNumbers()}
@@ -618,7 +694,7 @@ export default function QuizzesPage() {
                     disabled={currentPage === totalPages}
                     className="rounded-xl border border-slate-900 bg-slate-900/40 px-3 py-1.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    Next
+                    {tc('next')}
                   </button>
                 </div>
               )}
@@ -628,8 +704,8 @@ export default function QuizzesPage() {
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">
           <BookOpen className="mx-auto mb-4 h-12 w-12 opacity-30" />
-          <h3 className="font-bold text-lg text-white">No quizzes found</h3>
-          <p className="mt-1 text-sm">Create a new quiz configurations to get started.</p>
+          <h3 className="font-bold text-lg text-white">{tQuiz('noQuizzes')}</h3>
+          <p className="mt-1 text-sm">{tQuiz('noQuizzesSub')}</p>
         </div>
       )}
 
@@ -640,7 +716,7 @@ export default function QuizzesPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h2 className="text-xl font-bold text-white">
-                {editingQuiz ? 'Edit Quiz Config' : 'Create New Quiz'}
+                {editingQuiz ? tQuiz('editTitle') : tQuiz('createTitle')}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -656,15 +732,15 @@ export default function QuizzesPage() {
                 <div className="flex items-start gap-3">
                   <HelpCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-white">Manage Quiz Questions</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">Add, edit, or delete questions and answer options for this quiz.</p>
+                    <h4 className="font-semibold text-white">{tQuiz('editQuestions')}</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">{tQuiz('editQuestionsSub')}</p>
                   </div>
                 </div>
                 <Link
                   href={`/quizzes/${editingQuiz.id}/questions`}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:brightness-110 active:scale-[0.98] transition shrink-0"
                 >
-                  <span>Go to Questions Manager</span>
+                  <span>{tQuiz('editQuestions')}</span>
                 </Link>
               </div>
             )}
@@ -674,16 +750,17 @@ export default function QuizzesPage() {
               {/* Title & Timezone */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Quiz Title</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('quizTitleLabel')}</label>
                   <input
                     type="text"
                     {...register('title')}
+                    placeholder={tQuiz('quizTitlePlaceholder')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   />
-                  {errors.title && <p className="text-xs text-rose-400">{errors.title.message}</p>}
+                  {errors.title && <p className="text-xs text-rose-400">{tQuiz(errors.title.message || '')}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Timezone</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('timezone')}</label>
                   <input
                     type="text"
                     {...register('timezone')}
@@ -694,17 +771,18 @@ export default function QuizzesPage() {
 
               {/* Description */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Description</label>
+                <label className="text-sm font-medium text-slate-300">{tQuiz('descriptionLabel')}</label>
                 <textarea
                   rows={3}
                   {...register('description')}
+                  placeholder={tQuiz('descriptionPlaceholder')}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500 resize-none"
                 />
               </div>
 
               {/* Category selector */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Quiz Category</label>
+                <label className="text-sm font-medium text-slate-300">{tQuiz('categoryLabel')}</label>
                 <select
                   {...register('category_id')}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
@@ -713,7 +791,7 @@ export default function QuizzesPage() {
                     setValue('category_id', val === '' ? null : val);
                   }}
                 >
-                  <option value="">[ Uncategorized ]</option>
+                  <option value="">{tQuiz('selectCategoryUncategorized')}</option>
                   {categories
                     .filter((c) => !c.is_system || c.name === 'Sample Tests')
                     .map((c) => (
@@ -727,38 +805,38 @@ export default function QuizzesPage() {
               {/* Stats: Duration, Max Attempts, Pass Score */}
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Duration (Minutes)</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('durationLabel')}</label>
                   <input
                     type="number"
                     {...register('duration_minutes')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   />
-                  {errors.duration_minutes && <p className="text-xs text-rose-400">{errors.duration_minutes.message}</p>}
+                  {errors.duration_minutes && <p className="text-xs text-rose-400">{tQuiz(errors.duration_minutes.message || '')}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Max Attempts</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('maxAttemptsLabel')}</label>
                   <input
                     type="number"
                     {...register('max_attempts')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   />
-                  {errors.max_attempts && <p className="text-xs text-rose-400">{errors.max_attempts.message}</p>}
+                  {errors.max_attempts && <p className="text-xs text-rose-400">{tQuiz(errors.max_attempts.message || '')}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Pass Score (%)</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('passScoreLabel')}</label>
                   <input
                     type="number"
                     {...register('pass_score')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   />
-                  {errors.pass_score && <p className="text-xs text-rose-400">{errors.pass_score.message}</p>}
+                  {errors.pass_score && <p className="text-xs text-rose-400">{tQuiz(errors.pass_score.message || '')}</p>}
                 </div>
               </div>
 
               {/* Availability: Dates */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Available From</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('availableFrom')}</label>
                   <input
                     type="datetime-local"
                     {...register('available_from')}
@@ -766,7 +844,7 @@ export default function QuizzesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Available Until</label>
+                  <label className="text-sm font-medium text-slate-300">{tQuiz('availableUntil')}</label>
                   <input
                     type="datetime-local"
                     {...register('available_until')}
@@ -783,7 +861,7 @@ export default function QuizzesPage() {
                     {...register('randomize_questions')}
                     className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="text-sm text-slate-300">Randomize Question Order</span>
+                  <span className="text-sm text-slate-300">{tQuiz('randomizeQuestions')}</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -792,7 +870,7 @@ export default function QuizzesPage() {
                     {...register('randomize_options')}
                     className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="text-sm text-slate-300">Randomize Answer Options</span>
+                  <span className="text-sm text-slate-300">{tQuiz('randomizeOptions')}</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -801,7 +879,7 @@ export default function QuizzesPage() {
                     {...register('show_result_immediately')}
                     className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="text-sm text-slate-300">Show Score Review Immediately</span>
+                  <span className="text-sm text-slate-300">{tQuiz('showResult')}</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -810,7 +888,7 @@ export default function QuizzesPage() {
                     {...register('safe_mode')}
                     className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
                   />
-                  <span className="text-sm text-indigo-400 font-semibold">Enable Proctoring Safe Mode</span>
+                  <span className="text-sm text-indigo-400 font-semibold">{tQuiz('safeMode')}</span>
                 </label>
               </div>
 
@@ -844,7 +922,7 @@ export default function QuizzesPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-blue-400" />
-                <span>Bulk Import Quizzes & Questions</span>
+                <span>{tQuiz('importTitle')}</span>
               </h2>
               <button 
                 onClick={() => {
@@ -861,14 +939,14 @@ export default function QuizzesPage() {
 
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Upload a CSV file containing quizzes, questions, options, and correctness mappings.</span>
+                <span>{tQuiz('uploadQuizCsvHint')}</span>
                 <a
                   href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/import/template`}
                   download="quizzes_template.csv"
                   className="flex items-center gap-1.5 text-blue-400 hover:underline font-semibold"
                 >
                   <Download className="h-3 w-3" />
-                  Download CSV Template
+                  {tQuiz('downloadTemplate')}
                 </a>
               </div>
 
@@ -886,23 +964,23 @@ export default function QuizzesPage() {
                 />
                 <Upload className="mx-auto h-10 w-10 text-slate-500 mb-3" />
                 <p className="text-sm font-semibold text-slate-200">
-                  {importFile ? importFile.name : 'Click to upload Quiz CSV'}
+                  {importFile ? importFile.name : tQuiz('clickUpload')}
                 </p>
-                <p className="text-xs text-slate-550 mt-1">Accepts only .csv files</p>
+                <p className="text-xs text-slate-550 mt-1">{tQuiz('acceptCsvHint')}</p>
               </div>
 
               {/* Preview */}
               {importPreview.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">Preview (First 5 Rows):</p>
+                  <p className="text-xs font-bold text-slate-450 uppercase tracking-wider">{tQuiz('importPreview')}</p>
                   <div className="rounded-xl border border-slate-850 overflow-hidden bg-slate-950/40 text-xs">
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-950/60 border-b border-slate-850 text-slate-400">
-                          <th className="p-2.5">Title</th>
-                          <th className="p-2.5">Category</th>
-                          <th className="p-2.5">Duration</th>
-                          <th className="p-2.5">Pass %</th>
+                          <th className="p-2.5">{tQuiz('titleCol')}</th>
+                          <th className="p-2.5">{tQuiz('categoryCol')}</th>
+                          <th className="p-2.5">{tQuiz('durationCol')}</th>
+                          <th className="p-2.5">{tQuiz('passCol')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-850">
@@ -910,7 +988,7 @@ export default function QuizzesPage() {
                           <tr key={idx} className="text-slate-300">
                             <td className="p-2.5 font-medium">{row.title}</td>
                             <td className="p-2.5 font-mono">{row.category_name || '-'}</td>
-                            <td className="p-2.5 font-mono">{row.duration} mins</td>
+                            <td className="p-2.5 font-mono">{row.duration} {tQuiz('minutesLabel')}</td>
                             <td className="p-2.5 font-mono">{row.pass_score}%</td>
                           </tr>
                         ))}
@@ -925,7 +1003,7 @@ export default function QuizzesPage() {
                 <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 space-y-2">
                   <p className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4" />
-                    Import Errors Found:
+                    {tQuiz('importErrors')}
                   </p>
                   <ul className="text-xs text-slate-400 list-disc list-inside space-y-1">
                     {importErrors.map((err, idx) => (
@@ -959,7 +1037,82 @@ export default function QuizzesPage() {
                 {isImporting && (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 )}
-                <span>Import</span>
+                <span>{tQuiz('importButton')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Category Edit Modal */}
+      {isQuickCategoryModalOpen && quickCategoryQuiz && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-[95%] max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <FolderTree className="h-5 w-5 text-blue-400" />
+                <span>{tQuiz('quickChangeCategory')}</span>
+              </h2>
+              <button 
+                onClick={() => {
+                  setIsQuickCategoryModalOpen(false);
+                  setQuickCategoryQuiz(null);
+                }} 
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400">
+                {tQuiz('quickChangeCategorySub')}
+              </p>
+              
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">{tQuiz('quizTitleLabel')}:</span>
+                <p className="text-sm font-bold text-white">{quickCategoryQuiz.title}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  {tQuiz('categoryLabel')}
+                </label>
+                <select
+                  value={selectedQuickCategoryId || ''}
+                  onChange={(e) => setSelectedQuickCategoryId(e.target.value === '' ? null : e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">{tQuiz('selectCategoryUncategorized')}</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {getCategoryPath(cat.id)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsQuickCategoryModalOpen(false);
+                  setQuickCategoryQuiz(null);
+                }}
+                className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
+              >
+                {tc('cancel')}
+              </button>
+              <button
+                onClick={handleQuickCategorySave}
+                disabled={isSubmitLoading}
+                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-blue-500 disabled:opacity-50 transition"
+              >
+                {isSubmitLoading && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                )}
+                <span>{tQuiz('quickCategorySave')}</span>
               </button>
             </div>
           </div>

@@ -27,8 +27,8 @@ import {
 
 const questionSchema = z.object({
   question_text: z.string().min(1, 'Question text is required'),
-  question_type: z.enum(['single', 'multiple']),
-  points: z.coerce.number().min(1, 'Points must be at least 1'),
+  question_type: z.enum(['single', 'multiple', 'weighted']),
+  points: z.coerce.number().min(0, 'Points must be at least 0'),
   explanation: z.string().optional().nullable(),
   order_num: z.coerce.number().min(1),
   code_language: z.string().optional().nullable(),
@@ -40,6 +40,10 @@ type QuestionFormValues = z.infer<typeof questionSchema>;
 const optionSchema = z.object({
   option_text: z.string().min(1, 'Option text is required'),
   is_correct: z.boolean().default(false),
+  points: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? 0 : Number(val)),
+    z.number().int().min(0, 'Points must be at least 0')
+  ).default(0),
 });
 
 type OptionFormValues = z.infer<typeof optionSchema>;
@@ -48,6 +52,7 @@ interface AnswerOption {
   id: string;
   option_text: string;
   is_correct: boolean;
+  points: number;
   order_num: number;
 }
 
@@ -61,7 +66,7 @@ interface QuestionImage {
 interface Question {
   id: string;
   question_text: string;
-  question_type: 'single' | 'multiple';
+  question_type: 'single' | 'multiple' | 'weighted';
   points: number;
   explanation: string | null;
   order_num: number;
@@ -74,6 +79,7 @@ interface Question {
 export default function QuestionsPage({ params }: { params: { id: string } }) {
   const quizId = params.id;
   const router = useRouter();
+  const t = useTranslations('Questions');
   const tc = useTranslations('Common');
 
   const [quizTitle, setQuizTitle] = useState('Quiz Questions');
@@ -97,6 +103,9 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
   // Image Upload states
   const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null); // maps to questionId
+
+  const targetQuestion = questions.find(q => q.id === targetQuestionId);
+  const isWeighted = targetQuestion?.question_type === 'weighted';
 
   const {
     register: registerQ,
@@ -203,19 +212,19 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       setIsQModalOpen(false);
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to save question');
+      alert(err?.message || t('failedSaveQuestion'));
     } finally {
       setIsQSubmitLoading(false);
     }
   };
 
   const handleDeleteQ = async (qId: string) => {
-    if (!confirm('Are you sure you want to delete this question? All its options will be deleted too.')) return;
+    if (!confirm(t('deleteQuestionConfirm'))) return;
     try {
       await apiClient(`/api/admin/questions/${qId}`, { method: 'DELETE' });
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete question');
+      alert(err?.message || t('failedDeleteQuestion'));
     }
   };
 
@@ -226,6 +235,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     resetOpt({
       option_text: '',
       is_correct: false,
+      points: 0,
     });
     setIsOptModalOpen(true);
   };
@@ -236,6 +246,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
     resetOpt({
       option_text: opt.option_text,
       is_correct: opt.is_correct,
+      points: opt.points || 0,
     });
     setIsOptModalOpen(true);
   };
@@ -243,34 +254,40 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   const onSubmitOpt = async (data: OptionFormValues) => {
     if (!targetQuestionId) return;
     setIsOptSubmitLoading(true);
+    const targetQuestion = questions.find(q => q.id === targetQuestionId);
+    const isWeighted = targetQuestion?.question_type === 'weighted';
+    const payload = {
+      ...data,
+      is_correct: isWeighted ? (data.points || 0) > 0 : data.is_correct,
+    };
     try {
       if (editingOption) {
         await apiClient(`/api/admin/options/${editingOption.id}`, {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
       } else {
         await apiClient(`/api/admin/questions/${targetQuestionId}/options`, {
           method: 'POST',
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
       }
       setIsOptModalOpen(false);
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to save option');
+      alert(err?.message || t('failedSaveOption'));
     } finally {
       setIsOptSubmitLoading(false);
     }
   };
 
   const handleDeleteOpt = async (optId: string) => {
-    if (!confirm('Are you sure you want to delete this option?')) return;
+    if (!confirm(t('deleteOptionConfirm'))) return;
     try {
       await apiClient(`/api/admin/options/${optId}`, { method: 'DELETE' });
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete option');
+      alert(err?.message || t('failedDeleteOption'));
     }
   };
 
@@ -319,20 +336,20 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Quiz Questions Manager</span>
+          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{t('title')}</span>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">{quizTitle}</h1>
         </div>
       </div>
 
       {/* Control bar */}
       <div className="flex justify-between items-center">
-        <p className="text-slate-400 text-sm">{questions.length} questions total</p>
+        <p className="text-slate-400 text-sm">{t('totalQuestions', { count: questions.length })}</p>
         <button
           onClick={openCreateQModal}
           className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 active:scale-[0.98] transition"
         >
           <Plus className="h-4 w-4" />
-          <span>Add Question</span>
+          <span>{t('addQuestion')}</span>
         </button>
       </div>
 
@@ -372,9 +389,11 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                       <div>
                         <h3 className="font-semibold text-white text-sm md:text-base pr-4 line-clamp-1">{q.question_text}</h3>
                         <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
-                          <span className="capitalize">{q.question_type} choice</span>
+                          <span className="capitalize">
+                            {q.question_type === 'weighted' ? t('weightedChoice') : (q.question_type === 'multiple' ? t('multipleChoice') : t('singleChoice'))}
+                          </span>
                           <span>•</span>
-                          <span>{q.points} points</span>
+                          <span>{q.points} {t('points').toLowerCase()}</span>
                         </div>
                       </div>
                     </div>
@@ -382,14 +401,14 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => openEditQModal(q)}
-                        title="Edit question text"
+                        title={t('editQuestion')}
                         className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteQ(q.id)}
-                        title="Delete question"
+                        title={t('deleteQuestionConfirm')}
                         className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10 transition"
                       >
                         <Trash className="h-4 w-4" />
@@ -439,20 +458,20 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                             disabled={isUploadingImage === q.id}
                           />
                           <ImageIcon className="h-4 w-4" />
-                          <span>{isUploadingImage === q.id ? 'Uploading...' : 'Upload Image'}</span>
+                          <span>{isUploadingImage === q.id ? tc('loading') : t('uploadImage')}</span>
                         </label>
                       </div>
 
                       {/* Answer Options Header */}
                       <div className="space-y-3">
                         <div className="flex justify-between items-center border-b border-slate-900/60 pb-2">
-                          <h4 className="font-bold text-slate-300 text-sm">Answer Options</h4>
+                          <h4 className="font-bold text-slate-300 text-sm">{t('answerOptions')}</h4>
                           <button
                             onClick={() => openCreateOptModal(q.id)}
                             className="flex items-center gap-1 text-xs text-blue-400 font-semibold hover:text-blue-300 transition"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            <span>Add Option</span>
+                            <span>{t('addOption')}</span>
                           </button>
                         </div>
 
@@ -467,7 +486,11 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                                   className="group flex items-center justify-between rounded-xl border border-slate-950/60 bg-slate-950/20 p-3 hover:bg-slate-950/40 transition"
                                 >
                                   <div className="flex items-center gap-3 pr-4">
-                                    {opt.is_correct ? (
+                                    {q.question_type === 'weighted' ? (
+                                      <span className="flex h-6 px-2 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 text-xs font-mono font-bold">
+                                        {opt.points || 0} pt{opt.points === 1 ? '' : 's'}
+                                      </span>
+                                    ) : opt.is_correct ? (
                                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
                                         <Check className="h-3 w-3" />
                                       </span>
@@ -476,7 +499,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                                     ) : (
                                       <CheckSquare className="h-5 w-5 shrink-0 text-slate-600" />
                                     )}
-                                    <span className={`text-sm ${opt.is_correct ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>
+                                    <span className={`text-sm ${opt.is_correct && q.question_type !== 'weighted' ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>
                                       {opt.option_text}
                                     </span>
                                   </div>
@@ -498,7 +521,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                                 </div>
                               ))
                           ) : (
-                            <p className="text-xs text-slate-600 italic">No options defined yet. Add at least one option.</p>
+                            <p className="text-xs text-slate-600 italic">{t('noOptions')}</p>
                           )}
                         </div>
                       </div>
@@ -508,7 +531,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                         <div className="rounded-xl border border-blue-500/10 bg-blue-500/5 p-4 text-xs">
                           <div className="flex items-center gap-1.5 text-blue-400 font-bold mb-1">
                             <Sparkles className="h-3.5 w-3.5" />
-                            <span>Explanation</span>
+                            <span>{t('explanation')}</span>
                           </div>
                           <div className="text-slate-400 leading-relaxed">
                             {renderExplanationWithCode(q.explanation)}
@@ -524,8 +547,8 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">
           <HelpCircle className="mx-auto mb-4 h-12 w-12 opacity-30" />
-          <h3 className="font-bold text-lg text-white">No questions yet</h3>
-          <p className="mt-1 text-sm">Add your first multiple-choice question to this quiz.</p>
+          <h3 className="font-bold text-lg text-white">{t('noQuestions')}</h3>
+          <p className="mt-1 text-sm">{t('noQuestionsSub')}</p>
         </div>
       )}
 
@@ -535,7 +558,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
           <div className="w-[95%] max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-white">
-                {editingQuestion ? 'Edit Question' : 'Add New Question'}
+                {editingQuestion ? t('editQuestion') : t('createQuestion')}
               </h2>
               <button onClick={() => setIsQModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
                 <X className="h-5 w-5" />
@@ -544,7 +567,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleSubmitQ(onSubmitQ)} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Question Text</label>
+                <label className="text-sm font-medium text-slate-300">{t('questionText')}</label>
                 <textarea
                   rows={3}
                   {...registerQ('question_text')}
@@ -555,18 +578,19 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Selection Type</label>
+                  <label className="text-sm font-medium text-slate-300">{t('selectionType')}</label>
                   <select
                     {...registerQ('question_type')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   >
-                    <option value="single">Single Choice (Radio)</option>
-                    <option value="multiple">Multiple Choice (Checkbox)</option>
+                    <option value="single">{t('singleChoice')}</option>
+                    <option value="multiple">{t('multipleChoice')}</option>
+                    <option value="weighted">{t('weightedChoice')}</option>
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Points Awarded</label>
+                  <label className="text-sm font-medium text-slate-300">{t('pointsAwarded')}</label>
                   <input
                     type="number"
                     {...registerQ('points')}
@@ -578,7 +602,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Display Order</label>
+                  <label className="text-sm font-medium text-slate-300">{t('displayOrder')}</label>
                   <input
                     type="number"
                     {...registerQ('order_num')}
@@ -591,12 +615,12 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
               {/* Code block section */}
               <div className="space-y-4 border-t border-slate-800/60 pt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Code Snippet Language (Optional)</label>
+                  <label className="text-sm font-medium text-slate-300">{t('codeLanguageOptional')}</label>
                   <select
                     {...registerQ('code_language')}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
                   >
-                    <option value="">None (Plain text question)</option>
+                    <option value="">{t('nonePlainQuestion')}</option>
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
                     <option value="python">Python</option>
@@ -622,17 +646,17 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
                 {watchLanguage && watchLanguage !== '' && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">Code Snippet Content</label>
+                    <label className="text-sm font-medium text-slate-300">{t('codeContent')}</label>
                     <textarea
                       rows={5}
                       {...registerQ('code_content')}
                       className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 font-mono text-xs text-slate-200 outline-none focus:border-blue-500 resize-y"
-                      placeholder="Paste your syntax code block here..."
+                      placeholder={t('codePlaceholder')}
                     />
 
                     {watchCodeContent && watchCodeContent.trim() !== '' && (
                       <div className="space-y-1.5 pt-2">
-                        <span className="text-xs font-bold text-slate-500">Live Code Preview</span>
+                        <span className="text-xs font-bold text-slate-500">{t('liveCodePreview')}</span>
                         <CodeBlock language={watchLanguage} code={watchCodeContent} />
                       </div>
                     )}
@@ -641,12 +665,12 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Explanation (Shown on result review)</label>
+                <label className="text-sm font-medium text-slate-300">{t('explanationReview')}</label>
                 <textarea
                   rows={4}
                   {...registerQ('explanation')}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500 resize-y"
-                  placeholder="Explain the answer. You can use markdown code blocks like:&#10;```javascript&#10;const x = 5;&#10;```"
+                  placeholder={t('explanationPlaceholderMarkdown')}
                 />
               </div>
 
@@ -678,7 +702,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
           <div className="w-[95%] max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-white">
-                {editingOption ? 'Edit Answer Option' : 'Add Answer Option'}
+                {editingOption ? t('editAnswerOption') : t('addAnswerOption')}
               </h2>
               <button onClick={() => setIsOptModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
                 <X className="h-5 w-5" />
@@ -687,7 +711,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleSubmitOpt(onSubmitOpt)} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Option Label / Text</label>
+                <label className="text-sm font-medium text-slate-300">{t('optionLabel')}</label>
                 <input
                   type="text"
                   {...registerOpt('option_text')}
@@ -696,14 +720,26 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                 {errorsOpt.option_text && <p className="text-xs text-rose-400">{errorsOpt.option_text.message}</p>}
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer pt-2">
-                <input
-                  type="checkbox"
-                  {...registerOpt('is_correct')}
-                  className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                />
-                <span className="text-sm text-slate-300 font-semibold">Is Correct Answer</span>
-              </label>
+              {isWeighted ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">{t('optionPoints')}</label>
+                  <input
+                    type="number"
+                    {...registerOpt('points')}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-blue-500"
+                  />
+                  {errorsOpt.points && <p className="text-xs text-rose-400">{errorsOpt.points.message}</p>}
+                </div>
+              ) : (
+                <label className="flex items-center gap-3 cursor-pointer pt-2">
+                  <input
+                    type="checkbox"
+                    {...registerOpt('is_correct')}
+                    className="rounded border-slate-800 bg-slate-950 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  />
+                  <span className="text-sm text-slate-300 font-semibold">{t('isCorrect')}</span>
+                </label>
+              )}
 
               <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
                 <button

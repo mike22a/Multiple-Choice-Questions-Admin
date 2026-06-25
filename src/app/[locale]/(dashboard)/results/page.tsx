@@ -72,6 +72,7 @@ interface AttemptDetail {
 
 export default function ResultsPage() {
   const tc = useTranslations('Common');
+  const tRes = useTranslations('Results');
   
   const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
   const [quizzes, setQuizzes] = useState<{ id: string; title: string }[]>([]);
@@ -241,26 +242,26 @@ export default function ResultsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Results & Reports</h1>
-        <p className="mt-2 text-slate-400">View real-time exam performances, evaluate candidate answers, and proctor violations.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">{tRes('title')}</h1>
+        <p className="mt-2 text-slate-400">{tRes('subtitle')}</p>
       </div>
 
       {/* Metrics Row */}
       <div className="grid gap-6 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Evaluated</p>
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{tRes('totalEvaluated')}</p>
           <h3 className="text-3xl font-bold tracking-tight text-white mt-2">{metrics.totalEvaluated} / {metrics.totalMatching}</h3>
-          <p className="text-xs text-slate-500 mt-2">Sessions closed & scored</p>
+          <p className="text-xs text-slate-500 mt-2">{tRes('totalEvaluatedSub')}</p>
         </div>
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Average Score</p>
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{tRes('averageScore')}</p>
           <h3 className="text-3xl font-bold tracking-tight text-blue-400 mt-2">{metrics.averageScore}%</h3>
-          <p className="text-xs text-slate-500 mt-2">Overall class standard</p>
+          <p className="text-xs text-slate-500 mt-2">{tRes('averageScoreSub')}</p>
         </div>
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Pass Rate</p>
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{tRes('passRate')}</p>
           <h3 className="text-3xl font-bold tracking-tight text-emerald-400 mt-2">{metrics.passRate}%</h3>
-          <p className="text-xs text-slate-500 mt-2">Passing score details in quiz</p>
+          <p className="text-xs text-slate-500 mt-2">{tRes('passRateSub')}</p>
         </div>
       </div>
 
@@ -270,7 +271,7 @@ export default function ResultsPage() {
           <Search className="h-5 w-5 text-slate-500 shrink-0" />
           <input
             type="text"
-            placeholder="Search candidate name or email..."
+            placeholder={tRes('searchPlaceholder')}
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
@@ -284,7 +285,7 @@ export default function ResultsPage() {
             onChange={(e) => handleQuizChange(e.target.value)}
             className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 text-xs text-slate-300 outline-none hover:bg-slate-900 hover:text-white"
           >
-            <option value="all">All Quizzes</option>
+            <option value="all">{tRes('allQuizzes')}</option>
             {quizzes.map((q) => (
               <option key={q.id} value={q.id}>{q.title}</option>
             ))}
@@ -296,11 +297,11 @@ export default function ResultsPage() {
             onChange={(e) => handleStatusChange(e.target.value)}
             className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 text-xs text-slate-300 outline-none hover:bg-slate-900 hover:text-white"
           >
-            <option value="all">All Statuses</option>
-            <option value="submitted">Submitted</option>
-            <option value="force_submitted">Force Submitted</option>
-            <option value="expired">Expired</option>
-            <option value="in_progress">In Progress</option>
+            <option value="all">{tRes('allStatuses')}</option>
+            <option value="submitted">{tRes('submitted')}</option>
+            <option value="force_submitted">{tRes('forceSubmitted')}</option>
+            <option value="expired">{tRes('expired')}</option>
+            <option value="in_progress">{tRes('inProgress')}</option>
           </select>
         </div>
       </div>
@@ -317,12 +318,12 @@ export default function ResultsPage() {
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-950/20">
-                    <th className="py-4 px-6">Candidate</th>
-                    <th className="py-4 px-6">Quiz Title</th>
-                    <th className="py-4 px-6">Status</th>
-                    <th className="py-4 px-6 text-center">Violations</th>
-                    <th className="py-4 px-6 text-right">Score</th>
-                    <th className="py-4 px-6 text-right">Actions</th>
+                    <th className="py-4 px-6">{tRes('candidate')}</th>
+                    <th className="py-4 px-6">{tRes('quiz')}</th>
+                    <th className="py-4 px-6">{tRes('status')}</th>
+                    <th className="py-4 px-6 text-center">{tRes('violations')}</th>
+                    <th className="py-4 px-6 text-right">{tRes('score')}</th>
+                    <th className="py-4 px-6 text-right">{tc('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/60">
@@ -342,7 +343,10 @@ export default function ResultsPage() {
                             att.status === 'expired' ? 'bg-amber-500/10 text-amber-400' :
                             'bg-blue-500/10 text-blue-400'
                           }`}>
-                            {att.status.replace('_', ' ')}
+                            {att.status === 'submitted' ? tRes('submitted') :
+                             att.status === 'force_submitted' ? tRes('forceSubmitted') :
+                             att.status === 'expired' ? tRes('expired') :
+                             tRes('inProgress')}
                           </span>
                         </td>
                         <td className="py-4 px-6 text-center">
@@ -362,11 +366,11 @@ export default function ResultsPage() {
                             <button
                               onClick={() => handleForceSubmit(att.id)}
                               disabled={isActionLoading}
-                              title="Force submit session"
+                              title={tRes('forceSubmit')}
                               className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-1.5 text-xs font-semibold text-cyan-400 hover:bg-cyan-500 hover:text-white transition disabled:opacity-50"
                             >
                               <Zap className="h-3.5 w-3.5" />
-                              <span>Force Submit</span>
+                              <span>{tRes('forceSubmit')}</span>
                             </button>
                           ) : (
                             <button
@@ -374,7 +378,7 @@ export default function ResultsPage() {
                               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:bg-blue-600 hover:text-white transition"
                             >
                               <Eye className="h-3.5 w-3.5" />
-                              <span>Evaluate</span>
+                              <span>{tRes('viewDetails')}</span>
                             </button>
                           )}
                         </td>
@@ -390,11 +394,7 @@ export default function ResultsPage() {
           {totalAttempts > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
               <div>
-                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
-                <span className="font-semibold text-white">
-                  {Math.min(currentPage * itemsPerPage, totalAttempts)}
-                </span>{' '}
-                of <span className="font-semibold text-white">{totalAttempts}</span> attempts
+                {tc('showingRange', { start: (currentPage - 1) * itemsPerPage + 1, end: Math.min(currentPage * itemsPerPage, totalAttempts), total: totalAttempts })}
               </div>
               
               {totalPages > 1 && (
@@ -404,7 +404,7 @@ export default function ResultsPage() {
                     disabled={currentPage === 1}
                     className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    Previous
+                    {tc('previous')}
                   </button>
                   
                   {renderPageNumbers()}
@@ -414,7 +414,7 @@ export default function ResultsPage() {
                     disabled={currentPage === totalPages}
                     className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    Next
+                    {tc('next')}
                   </button>
                 </div>
               )}
@@ -424,8 +424,8 @@ export default function ResultsPage() {
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">
           <BarChart3 className="mx-auto mb-4 h-12 w-12 opacity-30" />
-          <h3 className="font-bold text-lg text-white">No attempts found</h3>
-          <p className="mt-1 text-sm">Waiting for candidates to take and submit active quizzes.</p>
+          <h3 className="font-bold text-lg text-white">{tRes('noResults')}</h3>
+          <p className="mt-1 text-sm">{tRes('noResultsSub')}</p>
         </div>
       )}
 
@@ -436,7 +436,7 @@ export default function ResultsPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
-                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Candidate Detailed Evaluation</span>
+                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{tRes('candidateReview')}</span>
                 <h2 className="text-xl font-bold text-white mt-1">
                   {attemptDetail ? attemptDetail.attempt.fullName : 'Loading details...'}
                 </h2>
@@ -458,23 +458,23 @@ export default function ResultsPage() {
                 {/* Attempt Summary Stats */}
                 <div className="grid gap-4 sm:grid-cols-4 rounded-2xl bg-slate-950/50 p-4 border border-slate-800/40 text-center text-xs">
                   <div>
-                    <span className="text-slate-500">Quiz Title</span>
+                    <span className="text-slate-500">{tRes('quiz')}</span>
                     <p className="font-bold text-white mt-1 truncate">{attemptDetail.attempt.quizTitle}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Score Achieved</span>
+                    <span className="text-slate-500">{tRes('scoreAchieved')}</span>
                     <p className={`font-bold mt-1 text-base ${attemptDetail.attempt.score !== null && attemptDetail.attempt.score >= attemptDetail.attempt.passScore ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {attemptDetail.attempt.score}%
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Correct Answers</span>
+                    <span className="text-slate-500">{tRes('correctAnswers')}</span>
                     <p className="font-bold text-white mt-1">
                       {attemptDetail.attempt.correctAnswers} / {attemptDetail.attempt.totalQuestions}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Proctor Violations</span>
+                    <span className="text-slate-500">{tRes('proctorViolations')}</span>
                     <p className={`font-bold mt-1 ${attemptDetail.attempt.safeModeViolations > 0 ? 'text-rose-400 font-semibold' : 'text-slate-400'}`}>
                       {attemptDetail.attempt.safeModeViolations}
                     </p>
@@ -483,7 +483,7 @@ export default function ResultsPage() {
 
                 {/* Candidate Answers Breakdown */}
                 <div className="space-y-4">
-                  <h3 className="font-bold text-white text-sm border-b border-slate-800 pb-2">Questions Response Log</h3>
+                  <h3 className="font-bold text-white text-sm border-b border-slate-800 pb-2">{tRes('questions')}</h3>
                   
                   {attemptDetail.questions.map((q, idx) => {
                     const ans = q.userResponse;
@@ -497,7 +497,7 @@ export default function ResultsPage() {
                           </div>
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${isCorrect ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                             {isCorrect ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                            <span>{q.points} pts</span>
+                            <span>{tRes('pts', { points: q.points })}</span>
                           </span>
                         </div>
 
@@ -526,7 +526,7 @@ export default function ResultsPage() {
                                   <span className="h-4 w-4 shrink-0 rounded-full border border-slate-700" />
                                 )}
                                 <span>{opt.optionText}</span>
-                                {isSelected && <span className="text-[10px] uppercase font-bold tracking-wider">(Candidate choice)</span>}
+                                {isSelected && <span className="text-[10px] uppercase font-bold tracking-wider">{tRes('candidateChoice')}</span>}
                               </div>
                             );
                           })}
@@ -535,7 +535,7 @@ export default function ResultsPage() {
                         {/* Explanation Box */}
                         {q.explanation && (
                           <div className="rounded-lg bg-slate-900 p-3 text-[11px] text-slate-400 border border-slate-800/40">
-                            <span className="font-bold text-slate-300 block mb-1">Explanation:</span>
+                            <span className="font-bold text-slate-300 block mb-1">{tRes('explanation')}:</span>
                             <div className="leading-relaxed">
                               {renderExplanationWithCode(q.explanation)}
                             </div>
@@ -552,7 +552,7 @@ export default function ResultsPage() {
                     onClick={() => setSelectedAttemptId(null)}
                     className="rounded-xl bg-slate-900 border border-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
                   >
-                    Close Review
+                    {tc('close')}
                   </button>
                 </div>
               </div>

@@ -16,7 +16,9 @@ import {
   Globe, 
   User,
   ChevronDown,
-  FolderTree
+  FolderTree,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 type Props = {
@@ -32,9 +34,24 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
 
   const { profile, isAuthenticated, clearAuth } = useAuthStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Sync collapsed state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved === 'true') {
+      setIsSidebarCollapsed(true);
+    }
+  }, []);
+
+  const handleToggleSidebar = () => {
+    const nextState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(nextState);
+    localStorage.setItem('sidebar-collapsed', String(nextState));
+  };
 
   // Monitor store hydration
   useEffect(() => {
@@ -87,19 +104,32 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative">
       {/* Background glowing decorations */}
-      <div className="absolute top-0 right-0 h-[600px] w-[600px] rounded-full bg-blue-600/5 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 h-[600px] w-[600px] rounded-full bg-indigo-600/5 blur-[150px] pointer-events-none" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-0 right-0 h-[600px] w-[600px] rounded-full bg-blue-600/5 blur-[150px]" />
+        <div className="absolute bottom-0 left-0 h-[600px] w-[600px] rounded-full bg-indigo-600/5 blur-[150px]" />
+      </div>
 
       {/* Sidebar Navigation */}
-      <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 border-r border-slate-900 bg-slate-950/80 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex h-16 items-center justify-between px-6 border-b border-slate-900">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10">
+      <aside className={`fixed top-0 bottom-0 left-0 z-50 border-r border-slate-900 bg-slate-950/80 backdrop-blur-xl transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        {/* Floating absolute collapse button for desktop */}
+        <button 
+          onClick={handleToggleSidebar} 
+          className="hidden lg:flex absolute top-5 -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-900 hover:text-white hover:scale-110 shadow-lg shadow-black/50 transition-all duration-200"
+          title={isSidebarCollapsed ? tc('expand') : tc('collapse')}
+        >
+          {isSidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
+
+        <div className="flex h-16 items-center justify-between px-5 border-b border-slate-900">
+          <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10">
               <span className="font-bold text-lg">M</span>
             </div>
-            <span className="font-bold tracking-tight text-white">{tc('title')}</span>
+            <span className={`font-bold tracking-tight text-white transition-all duration-300 truncate ${isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-xs opacity-100'}`}>
+              {tc('title')}
+            </span>
           </Link>
           <button onClick={() => setIsSidebarOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden">
             <X className="h-5 w-5" />
@@ -113,11 +143,14 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'}`}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:bg-slate-900/60 hover:text-slate-200'}`}
                 onClick={() => setIsSidebarOpen(false)}
+                title={isSidebarCollapsed ? item.name : undefined}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
-                <span>{item.name}</span>
+                <span className={`truncate transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-xs opacity-100'}`}>
+                  {item.name}
+                </span>
               </Link>
             );
           })}
@@ -127,15 +160,18 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-rose-400 transition hover:bg-rose-500/10"
+            title={isSidebarCollapsed ? tc('logout') : undefined}
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            <span>{tc('logout')}</span>
+            <span className={`truncate transition-all duration-300 ${isSidebarCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-xs opacity-100'}`}>
+              {tc('logout')}
+            </span>
           </button>
         </div>
       </aside>
 
       {/* Main Dashboard Panel */}
-      <div className="lg:pl-64 w-full min-w-0">
+      <div className={`transition-all duration-300 w-full min-w-0 ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Header bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950/70 px-6 backdrop-blur-md">
           <button
@@ -177,7 +213,7 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
                   <div className="fixed inset-0 z-10" onClick={() => setIsProfileDropdownOpen(false)} />
                   <div className="absolute right-0 mt-2 z-20 w-48 rounded-2xl border border-slate-800 bg-slate-900 p-2 shadow-xl">
                     <div className="px-3 py-2 text-xs border-b border-slate-800 mb-1">
-                      <p className="font-semibold text-slate-400">Logged in as</p>
+                      <p className="font-semibold text-slate-400">{tc('loggedInAs')}</p>
                       <p className="font-bold text-white truncate">{profile?.email}</p>
                     </div>
                     <button

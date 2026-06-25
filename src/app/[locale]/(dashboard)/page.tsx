@@ -34,6 +34,7 @@ interface DashboardStats {
 
 export default function DashboardPage({ params: { locale } }: { params: { locale: string } }) {
   const tc = useTranslations('Common');
+  const tDash = useTranslations('Dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
         const res = await apiClient('/api/admin/dashboard/stats');
         setStats(res?.data || res);
       } catch (err: any) {
-        setError(err?.message || 'Failed to fetch dashboard stats');
+        setError(err?.message || tDash('failedFetchStats'));
       } finally {
         setIsLoading(false);
       }
@@ -69,7 +70,7 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
     return (
       <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-6 text-center text-rose-400">
         <AlertCircle className="mx-auto mb-3 h-10 w-10" />
-        <h3 className="font-bold text-lg">Error loading statistics</h3>
+        <h3 className="font-bold text-lg">{tDash('errorStats')}</h3>
         <p className="mt-1 text-sm text-rose-500/80">{error}</p>
       </div>
     );
@@ -77,30 +78,30 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
 
   const cards = [
     {
-      title: 'Total Quizzes',
+      title: tDash('totalQuizzes'),
       value: stats?.quizzes.total || 0,
-      subtext: `${stats?.quizzes.published || 0} published, ${stats?.quizzes.draft || 0} draft`,
+      subtext: tDash('quizzesSubtext', { published: stats?.quizzes.published || 0, draft: stats?.quizzes.draft || 0 }),
       icon: BookOpen,
       color: 'from-blue-600 to-cyan-500 shadow-blue-500/15',
     },
     {
-      title: 'Participants',
+      title: tDash('participants'),
       value: stats?.participants.total || 0,
-      subtext: `${stats?.participants.active || 0} active candidates`,
+      subtext: tDash('participantsSubtext', { active: stats?.participants.active || 0 }),
       icon: Users,
       color: 'from-indigo-600 to-purple-500 shadow-indigo-500/15',
     },
     {
-      title: 'Total Attempts',
+      title: tDash('totalAttempts'),
       value: stats?.attempts.total || 0,
-      subtext: 'Completed & in-progress sessions',
+      subtext: tDash('attemptsSubtext'),
       icon: Play,
       color: 'from-emerald-600 to-teal-500 shadow-emerald-500/15',
     },
     {
-      title: 'Average Score',
+      title: tDash('averageScore'),
       value: `${stats?.attempts.avgScore || 0}%`,
-      subtext: 'Performance indicator across quiz runs',
+      subtext: tDash('averageSubtext'),
       icon: Award,
       color: 'from-amber-600 to-orange-500 shadow-amber-500/15',
     },
@@ -110,8 +111,8 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
     <div className="space-y-8">
       {/* Welcome Banner */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Dashboard Overview</h1>
-        <p className="mt-2 text-slate-400">Welcome to your MCQ control center. Here is a summary of overall performance.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">{tDash('title')}</h1>
+        <p className="mt-2 text-slate-400">{tDash('subtitle')}</p>
       </div>
 
       {/* KPI Cards Grid */}
@@ -140,10 +141,10 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
         {/* Recent Attempts Table */}
         <div className="rounded-2xl border border-slate-900 bg-slate-900/20 p-6 backdrop-blur-xl lg:col-span-2 space-y-6 w-full min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Recent Quiz Attempts</h2>
+            <h2 className="text-xl font-bold text-white">{tDash('recentAttempts')}</h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <TrendingUp className="h-4 w-4 text-emerald-400" />
-              <span>Real-time feeds</span>
+              <span>{tDash('realtimeFeeds')}</span>
             </div>
           </div>
 
@@ -151,11 +152,11 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
             <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="pb-3 pr-4">Candidate</th>
-                  <th className="pb-3 px-4">Quiz</th>
-                  <th className="pb-3 px-4">Status</th>
-                  <th className="pb-3 px-4 text-right">Score</th>
-                  <th className="pb-3 pl-4 text-right">Started</th>
+                  <th className="pb-3 pr-4">{tDash('candidate')}</th>
+                  <th className="pb-3 px-4">{tDash('quiz')}</th>
+                  <th className="pb-3 px-4">{tDash('status')}</th>
+                  <th className="pb-3 px-4 text-right">{tDash('score')}</th>
+                  <th className="pb-3 pl-4 text-right">{tDash('started')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900/60">
@@ -176,7 +177,10 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
                           att.status === 'expired' ? 'bg-amber-500/10 text-amber-400' :
                           'bg-blue-500/10 text-blue-400'
                         }`}>
-                          {att.status.replace('_', ' ')}
+                          {att.status === 'submitted' ? tDash('submitted') :
+                           att.status === 'force_submitted' ? tDash('forceSubmitted') :
+                           att.status === 'expired' ? tDash('expired') :
+                           tDash('inProgress')}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right font-bold text-white">
@@ -191,7 +195,7 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-500">
                       <FileCheck className="mx-auto mb-2 h-8 w-8 opacity-45" />
-                      No recent quiz attempts found.
+                      {tDash('noRecentAttempts')}
                     </td>
                   </tr>
                 )}
@@ -202,7 +206,7 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
 
         {/* Quick Quick Start Info Panel */}
         <div className="rounded-2xl border border-slate-900 bg-slate-900/20 p-6 backdrop-blur-xl space-y-6">
-          <h2 className="text-xl font-bold text-white">Quick Tasks</h2>
+          <h2 className="text-xl font-bold text-white">{tDash('quickTasks')}</h2>
           
           <div className="space-y-4">
             <div className="flex items-start gap-4 rounded-xl bg-slate-900/60 p-4 border border-slate-800/40">
@@ -210,8 +214,8 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm">Active Test Window</h4>
-                <p className="mt-1 text-xs text-slate-400">Configure quiz availability windows (available_from/until) in settings.</p>
+                <h4 className="font-bold text-white text-sm">{tDash('activeTestWindow')}</h4>
+                <p className="mt-1 text-xs text-slate-400">{tDash('activeTestWindowSub')}</p>
               </div>
             </div>
 
@@ -220,8 +224,8 @@ export default function DashboardPage({ params: { locale } }: { params: { locale
                 <Award className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-bold text-white text-sm">Grading & Proctoring</h4>
-                <p className="mt-1 text-xs text-slate-400">Review safe mode tab-switch violations in the results log immediately.</p>
+                <h4 className="font-bold text-white text-sm">{tDash('gradingProctoring')}</h4>
+                <p className="mt-1 text-xs text-slate-400">{tDash('gradingProctoringSub')}</p>
               </div>
             </div>
           </div>
