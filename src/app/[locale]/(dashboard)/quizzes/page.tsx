@@ -73,6 +73,8 @@ interface Quiz {
   available_until: string | null;
   timezone: string;
   created_at: string;
+  total_questions?: number;
+  total_points?: number;
 }
 
 export default function QuizzesPage() {
@@ -85,6 +87,12 @@ export default function QuizzesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalQuizzes, setTotalQuizzes] = useState(0);
+  const itemsPerPage = 6;
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -108,12 +116,21 @@ export default function QuizzesPage() {
     resolver: zodResolver(quizSchema),
   });
 
-  const loadQuizzes = async () => {
+  const loadQuizzes = async (page = 1, searchQuery = '') => {
     setIsLoading(true);
     try {
-      const res = await apiClient('/api/admin/quizzes');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      const res = await apiClient(`/api/admin/quizzes?${params.toString()}`);
       const data = res?.data || res;
       setQuizzes(data?.quizzes || []);
+      setTotalQuizzes(data?.pagination?.total || 0);
+      setTotalPages(Math.ceil((data?.pagination?.total || 0) / itemsPerPage));
     } catch (err: any) {
       setError(err?.message || 'Failed to load quizzes');
     } finally {
@@ -132,9 +149,20 @@ export default function QuizzesPage() {
   };
 
   useEffect(() => {
-    loadQuizzes();
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      loadQuizzes(currentPage, search);
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [currentPage, search]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
 
   // CSV Import handlers
   const handleCsvSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,34 +174,66 @@ export default function QuizzesPage() {
     setImportPreview([]);
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length <= 1) return;
+    const parsedRows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+    let charIdx = 0;
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+    while (charIdx < text.length) {
+      const char = text[charIdx];
+      const nextChar = text[charIdx + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentField += '"';
+          charIdx += 2;
+          continue;
+        }
+        inQuotes = !inQuotes;
+        charIdx++;
+      } else if (char === ',' && !inQuotes) {
+        currentRow.push(currentField.trim().replace(/^["']|["']$/g, ''));
+        currentField = '';
+        charIdx++;
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        currentRow.push(currentField.trim().replace(/^["']|["']$/g, ''));
+        currentField = '';
+        
+        if (currentRow.length > 0 && currentRow.some(f => f !== '')) {
+          parsedRows.push(currentRow);
+        }
+        currentRow = [];
+        
+        if (char === '\r' && nextChar === '\n') {
+          charIdx += 2;
+        } else {
+          charIdx++;
+        }
+      } else {
+        currentField += char;
+        charIdx++;
+      }
+    }
+    
+    if (currentField || currentRow.length > 0) {
+      currentRow.push(currentField.trim().replace(/^["']|["']$/g, ''));
+      if (currentRow.some(f => f !== '')) {
+        parsedRows.push(currentRow);
+      }
+    }
+
+    if (parsedRows.length <= 1) return;
+
+    const headers = parsedRows[0].map(h => h.trim().toLowerCase());
     const parsedPreview = [];
 
-    for (let i = 1; i < Math.min(lines.length, 6); i++) {
-      const line = lines[i];
-      const parts: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      
-      for (let charIdx = 0; charIdx < line.length; charIdx++) {
-        const char = line[charIdx];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          parts.push(current.trim().replace(/^["']|["']$/g, ''));
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      parts.push(current.trim().replace(/^["']|["']$/g, ''));
+    for (let i = 1; i < Math.min(parsedRows.length, 6); i++) {
+      const parts = parsedRows[i];
 
       const getVal = (headerName: string) => {
         const idx = headers.indexOf(headerName);
-        return idx !== -1 ? parts[idx] : '';
+        return idx !== -1 && idx < parts.length ? parts[idx] : '';
       };
 
       parsedPreview.push({
@@ -323,10 +383,36 @@ export default function QuizzesPage() {
     }
   };
 
-  const filteredQuizzes = quizzes.filter(q => 
-    q.title.toLowerCase().includes(search.toLowerCase()) ||
-    (q.description && q.description.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredQuizzes = quizzes;
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      if (i >= 1) pages.push(i);
+    }
+    
+    return pages.map(page => (
+      <button
+        key={page}
+        onClick={() => setCurrentPage(page)}
+        className={`rounded-xl px-3 py-1.5 font-bold transition ${
+          currentPage === page
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+            : 'border border-slate-900 bg-slate-900/40 text-slate-400 hover:bg-slate-900 hover:text-white'
+        }`}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   return (
     <div className="space-y-8">
@@ -362,7 +448,7 @@ export default function QuizzesPage() {
           type="text"
           placeholder="Search quizzes..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
         />
       </div>
@@ -373,126 +459,171 @@ export default function QuizzesPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : filteredQuizzes.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 w-full min-w-0">
-          {filteredQuizzes.map((quiz) => (
-            <div 
-              key={quiz.id} 
-              className="group flex flex-col justify-between rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl transition hover:border-slate-800"
-            >
-              <div>
-                {/* Title & Status Badges */}
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-bold text-white text-lg group-hover:text-blue-400 transition">{quiz.title}</h3>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${quiz.is_published ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
-                    {quiz.is_published ? 'Published' : 'Draft'}
-                  </span>
-                </div>
+        <div className="space-y-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 w-full min-w-0">
+            {filteredQuizzes.map((quiz) => (
+              <div 
+                key={quiz.id} 
+                className="group flex flex-col justify-between rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl transition hover:border-slate-800"
+              >
+                <div>
+                  {/* Title & Status Badges */}
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-bold text-white text-lg group-hover:text-blue-400 transition">{quiz.title}</h3>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${quiz.is_published ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                      {quiz.is_published ? 'Published' : 'Draft'}
+                    </span>
+                  </div>
 
-                {/* Category Badge */}
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {quiz.category_id ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 uppercase tracking-wider">
-                      {categories.find(c => c.id === quiz.category_id)?.name || 'Loading Category...'}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      Uncategorized
-                    </span>
+                  {/* Category Badge */}
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {quiz.category_id ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+                        {categories.find(c => c.id === quiz.category_id)?.name || 'Loading Category...'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Uncategorized
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-xs text-slate-400 line-clamp-2 h-8">{quiz.description || 'No description provided.'}</p>
+
+                  {/* Details list */}
+                  <div className="mt-4 grid grid-cols-2 gap-y-3 gap-x-2 border-t border-slate-900/60 pt-4 text-xs">
+                    <div>
+                      <span className="text-slate-500">Duration:</span>
+                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.duration_minutes} mins</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Pass Score:</span>
+                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.pass_score}%</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Max Attempts:</span>
+                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.max_attempts}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Proctoring:</span>
+                      <span className={`ml-1.5 font-semibold inline-flex items-center gap-1 ${quiz.safe_mode ? 'text-indigo-400' : 'text-slate-500'}`}>
+                        {quiz.safe_mode ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                        <span>{quiz.safe_mode ? 'Enabled' : 'Disabled'}</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Questions:</span>
+                      <span className="ml-1.5 font-semibold text-slate-300">{quiz.total_questions ?? 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Total Score:</span>
+                      <span className="ml-1.5 font-semibold text-emerald-400">{quiz.total_points ?? 0} pts</span>
+                    </div>
+                  </div>
+
+                  {/* Dates info */}
+                  {(quiz.available_from || quiz.available_until) && (
+                    <div className="mt-4 rounded-lg bg-slate-950/40 p-2.5 text-[10px] text-slate-500 border border-slate-900/40">
+                      <p>Available: {quiz.available_from ? format(new Date(quiz.available_from), 'dd MMM yyyy HH:mm') : 'Anytime'} to {quiz.available_until ? format(new Date(quiz.available_until), 'dd MMM yyyy HH:mm') : 'Indefinite'}</p>
+                    </div>
                   )}
                 </div>
 
-                <p className="mt-2 text-xs text-slate-400 line-clamp-2 h-8">{quiz.description || 'No description provided.'}</p>
+                {/* Action buttons footer */}
+                <div className="mt-6 flex items-center justify-between border-t border-slate-900/60 pt-4">
+                  <Link
+                    href={`/quizzes/${quiz.id}/questions`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600/10 border border-blue-500/25 px-3.5 py-2 text-xs font-bold text-blue-400 hover:bg-blue-600 hover:text-white hover:border-transparent transition"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Manage Questions</span>
+                  </Link>
 
-                {/* Details list */}
-                <div className="mt-4 grid grid-cols-2 gap-y-3 gap-x-2 border-t border-slate-900/60 pt-4 text-xs">
-                  <div>
-                    <span className="text-slate-500">Duration:</span>
-                    <span className="ml-1.5 font-semibold text-slate-300">{quiz.duration_minutes} mins</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Pass Score:</span>
-                    <span className="ml-1.5 font-semibold text-slate-300">{quiz.pass_score}%</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Max Attempts:</span>
-                    <span className="ml-1.5 font-semibold text-slate-300">{quiz.max_attempts}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Proctoring:</span>
-                    <span className={`ml-1.5 font-semibold inline-flex items-center gap-1 ${quiz.safe_mode ? 'text-indigo-400' : 'text-slate-500'}`}>
-                      {quiz.safe_mode ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
-                      <span>{quiz.safe_mode ? 'Enabled' : 'Disabled'}</span>
-                    </span>
+                  <div className="flex items-center gap-2">
+                    {/* Toggle publish button */}
+                    <button
+                      onClick={() => togglePublish(quiz)}
+                      title={quiz.is_published ? 'Unpublish' : 'Publish'}
+                      className={`rounded-lg p-2 transition ${quiz.is_published ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
+                    >
+                      {quiz.is_published ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                    </button>
+
+                    {/* Toggle safe mode button */}
+                    <button
+                      onClick={() => toggleSafeMode(quiz)}
+                      title="Toggle proctoring safe mode"
+                      className={`rounded-lg p-2 transition ${quiz.safe_mode ? 'text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </button>
+
+                    {/* Export CSV link */}
+                    <a
+                      href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/${quiz.id}/export`}
+                      title="Export questions CSV"
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
+                    >
+                      <FileDown className="h-4 w-4" />
+                    </a>
+
+                    {/* Edit button */}
+                    <button
+                      onClick={() => openEditModal(quiz)}
+                      title="Edit metadata"
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => handleDelete(quiz.id)}
+                      title="Delete Quiz"
+                      className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10 transition"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-
-                {/* Dates info */}
-                {(quiz.available_from || quiz.available_until) && (
-                  <div className="mt-4 rounded-lg bg-slate-950/40 p-2.5 text-[10px] text-slate-500 border border-slate-900/40">
-                    <p>Available: {quiz.available_from ? format(new Date(quiz.available_from), 'dd MMM yyyy HH:mm') : 'Anytime'} to {quiz.available_until ? format(new Date(quiz.available_until), 'dd MMM yyyy HH:mm') : 'Indefinite'}</p>
-                  </div>
-                )}
               </div>
+            ))}
+          </div>
 
-              {/* Action buttons footer */}
-              <div className="mt-6 flex items-center justify-between border-t border-slate-900/60 pt-4">
-                <Link
-                  href={`/quizzes/${quiz.id}/questions`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600/10 border border-blue-500/25 px-3.5 py-2 text-xs font-bold text-blue-400 hover:bg-blue-600 hover:text-white hover:border-transparent transition"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>Manage Questions</span>
-                </Link>
-
+          {/* Pagination UI */}
+          {totalQuizzes > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
+              <div>
+                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                <span className="font-semibold text-white">
+                  {Math.min(currentPage * itemsPerPage, totalQuizzes)}
+                </span>{' '}
+                of <span className="font-semibold text-white">{totalQuizzes}</span> quizzes
+              </div>
+              
+              {totalPages > 1 && (
                 <div className="flex items-center gap-2">
-                  {/* Toggle publish button */}
                   <button
-                    onClick={() => togglePublish(quiz)}
-                    title={quiz.is_published ? 'Unpublish' : 'Publish'}
-                    className={`rounded-lg p-2 transition ${quiz.is_published ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3 py-1.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    {quiz.is_published ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                    Previous
                   </button>
-
-                  {/* Toggle safe mode button */}
+                  
+                  {renderPageNumbers()}
+                  
                   <button
-                    onClick={() => toggleSafeMode(quiz)}
-                    title="Toggle proctoring safe mode"
-                    className={`rounded-lg p-2 transition ${quiz.safe_mode ? 'text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:bg-slate-900'}`}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3 py-1.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
                   >
-                    <Settings2 className="h-4 w-4" />
-                  </button>
-
-                  {/* Export CSV link */}
-                  <a
-                    href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/admin/quizzes/${quiz.id}/export`}
-                    title="Export questions CSV"
-                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
-                  >
-                    <FileDown className="h-4 w-4" />
-                  </a>
-
-                  {/* Edit button */}
-                  <button
-                    onClick={() => openEditModal(quiz)}
-                    title="Edit metadata"
-                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-
-                  {/* Delete button */}
-                  <button
-                    onClick={() => handleDelete(quiz.id)}
-                    title="Delete Quiz"
-                    className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/10 transition"
-                  >
-                    <Trash className="h-4 w-4" />
+                    Next
                   </button>
                 </div>
-              </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">

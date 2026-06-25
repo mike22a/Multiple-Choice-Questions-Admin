@@ -83,35 +83,97 @@ export default function ResultsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAttempts, setTotalAttempts] = useState(0);
+  const itemsPerPage = 10;
+
+  // Metrics state
+  const [metrics, setMetrics] = useState({
+    totalMatching: 0,
+    totalEvaluated: 0,
+    averageScore: 0,
+    passRate: 0,
+  });
+
   // Attempt Detail Modal states
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   const [attemptDetail, setAttemptDetail] = useState<AttemptDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadQuizzes = async () => {
     try {
-      // Load dashboard stats which includes recent attempts
-      const statsRes = await apiClient('/api/admin/dashboard/stats');
-      const stats = statsRes?.data || statsRes;
-      setAttempts(stats?.recentAttempts || []);
-
-      // Load quizzes for filter
-      const quizListRes = await apiClient('/api/admin/quizzes');
+      const quizListRes = await apiClient('/api/admin/quizzes?limit=100');
       const quizList = quizListRes?.data || quizListRes;
       const quizzesData = quizList?.quizzes || quizList || [];
       setQuizzes(quizzesData.map((q: any) => ({ id: q.id, title: q.title })));
+    } catch (err) {
+      console.error('Failed to load quizzes for filter', err);
+    }
+  };
+
+  const loadAttempts = async (page = 1, searchQuery = '', quizId = 'all', status = 'all') => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      if (quizId && quizId !== 'all') {
+        params.append('quiz_id', quizId);
+      }
+      if (status && status !== 'all') {
+        params.append('status', status);
+      }
+
+      const res = await apiClient(`/api/admin/attempts?${params.toString()}`);
+      const data = res?.data || res;
+      setAttempts(data?.attempts || []);
+      setMetrics(data?.metrics || {
+        totalMatching: 0,
+        totalEvaluated: 0,
+        averageScore: 0,
+        passRate: 0,
+      });
+      setTotalAttempts(data?.pagination?.total || 0);
+      setTotalPages(Math.ceil((data?.pagination?.total || 0) / itemsPerPage));
     } catch (err: any) {
-      setError(err?.message || 'Failed to load results');
+      setError(err?.message || 'Failed to load attempts');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadQuizzes();
   }, []);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      loadAttempts(currentPage, search, selectedQuizId, selectedStatus);
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [currentPage, search, selectedQuizId, selectedStatus]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
+
+  const handleQuizChange = (val: string) => {
+    setSelectedQuizId(val);
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (val: string) => {
+    setSelectedStatus(val);
+    setCurrentPage(1);
+  };
 
   const loadAttemptDetail = async (id: string) => {
     setIsDetailLoading(true);
@@ -133,7 +195,7 @@ export default function ResultsPage() {
     setIsActionLoading(true);
     try {
       await apiClient(`/api/admin/attempts/${id}/force-submit`, { method: 'POST' });
-      loadData();
+      loadAttempts(currentPage, search, selectedQuizId, selectedStatus);
       if (selectedAttemptId === id) {
         loadAttemptDetail(id);
       }
@@ -144,27 +206,36 @@ export default function ResultsPage() {
     }
   };
 
-  // Filter attempts
-  const filteredAttempts = attempts.filter(att => {
-    const matchesSearch = 
-      att.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      att.email.toLowerCase().includes(search.toLowerCase()) ||
-      att.quizTitle.toLowerCase().includes(search.toLowerCase());
+  const filteredAttempts = attempts;
 
-    const matchesQuiz = selectedQuizId === 'all' || att.quizTitle === quizzes.find(q => q.id === selectedQuizId)?.title;
-    const matchesStatus = selectedStatus === 'all' || att.status === selectedStatus;
-
-    return matchesSearch && matchesQuiz && matchesStatus;
-  });
-
-  // Calculate Metrics
-  const submittedAttempts = filteredAttempts.filter(a => a.status === 'submitted' || a.status === 'force_submitted');
-  const averageScore = submittedAttempts.length > 0
-    ? Math.round(submittedAttempts.reduce((acc, curr) => acc + (curr.score || 0), 0) / submittedAttempts.length)
-    : 0;
-  const passRate = submittedAttempts.length > 0
-    ? Math.round((submittedAttempts.filter(a => (a.score || 0) >= 70).length / submittedAttempts.length) * 100)
-    : 0;
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      if (i >= 1) pages.push(i);
+    }
+    
+    return pages.map(page => (
+      <button
+        key={page}
+        onClick={() => setCurrentPage(page)}
+        className={`rounded-xl px-3 py-1.5 font-bold transition ${
+          currentPage === page
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+            : 'border border-slate-900 bg-slate-900/40 text-slate-400 hover:bg-slate-900 hover:text-white'
+        }`}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   return (
     <div className="space-y-8">
@@ -178,18 +249,18 @@ export default function ResultsPage() {
       <div className="grid gap-6 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Evaluated</p>
-          <h3 className="text-3xl font-bold tracking-tight text-white mt-2">{submittedAttempts.length} / {filteredAttempts.length}</h3>
+          <h3 className="text-3xl font-bold tracking-tight text-white mt-2">{metrics.totalEvaluated} / {metrics.totalMatching}</h3>
           <p className="text-xs text-slate-500 mt-2">Sessions closed & scored</p>
         </div>
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Average Score</p>
-          <h3 className="text-3xl font-bold tracking-tight text-blue-400 mt-2">{averageScore}%</h3>
+          <h3 className="text-3xl font-bold tracking-tight text-blue-400 mt-2">{metrics.averageScore}%</h3>
           <p className="text-xs text-slate-500 mt-2">Overall class standard</p>
         </div>
         <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl">
           <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Pass Rate</p>
-          <h3 className="text-3xl font-bold tracking-tight text-emerald-400 mt-2">{passRate}%</h3>
-          <p className="text-xs text-slate-500 mt-2">Passing score default: 70%</p>
+          <h3 className="text-3xl font-bold tracking-tight text-emerald-400 mt-2">{metrics.passRate}%</h3>
+          <p className="text-xs text-slate-500 mt-2">Passing score details in quiz</p>
         </div>
       </div>
 
@@ -201,7 +272,7 @@ export default function ResultsPage() {
             type="text"
             placeholder="Search candidate name or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
           />
         </div>
@@ -210,7 +281,7 @@ export default function ResultsPage() {
           {/* Quiz filter */}
           <select
             value={selectedQuizId}
-            onChange={(e) => setSelectedQuizId(e.target.value)}
+            onChange={(e) => handleQuizChange(e.target.value)}
             className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 text-xs text-slate-300 outline-none hover:bg-slate-900 hover:text-white"
           >
             <option value="all">All Quizzes</option>
@@ -222,7 +293,7 @@ export default function ResultsPage() {
           {/* Status filter */}
           <select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => handleStatusChange(e.target.value)}
             className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 text-xs text-slate-300 outline-none hover:bg-slate-900 hover:text-white"
           >
             <option value="all">All Statuses</option>
@@ -240,78 +311,115 @@ export default function ResultsPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : filteredAttempts.length > 0 ? (
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-950/20">
-                  <th className="py-4 px-6">Candidate</th>
-                  <th className="py-4 px-6">Quiz Title</th>
-                  <th className="py-4 px-6">Status</th>
-                  <th className="py-4 px-6 text-center">Violations</th>
-                  <th className="py-4 px-6 text-right">Score</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-900/60">
-                {filteredAttempts.map((att) => {
-                  const isPass = att.score !== null && att.score >= 70;
-                  return (
-                    <tr key={att.id} className="hover:bg-slate-900/20 transition">
-                      <td className="py-4 px-6">
-                        <p className="font-semibold text-white">{att.fullName}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{att.email}</p>
-                      </td>
-                      <td className="py-4 px-6 text-slate-300 font-medium">{att.quizTitle}</td>
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          att.status === 'submitted' ? 'bg-emerald-500/10 text-emerald-400' :
-                          att.status === 'force_submitted' ? 'bg-cyan-500/10 text-cyan-400' :
-                          att.status === 'expired' ? 'bg-amber-500/10 text-amber-400' :
-                          'bg-blue-500/10 text-blue-400'
-                        }`}>
-                          {att.status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold ${att.safeModeViolations > 0 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-slate-500'}`}>
-                          {att.safeModeViolations}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-right font-bold">
-                        {att.score !== null ? (
-                          <span className={isPass ? 'text-emerald-400' : 'text-rose-400'}>
-                            {att.score}%
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-950/20">
+                    <th className="py-4 px-6">Candidate</th>
+                    <th className="py-4 px-6">Quiz Title</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6 text-center">Violations</th>
+                    <th className="py-4 px-6 text-right">Score</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-900/60">
+                  {filteredAttempts.map((att) => {
+                    const isPass = att.score !== null && att.score >= 70;
+                    return (
+                      <tr key={att.id} className="hover:bg-slate-900/20 transition">
+                        <td className="py-4 px-6">
+                          <p className="font-semibold text-white">{att.fullName}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{att.email}</p>
+                        </td>
+                        <td className="py-4 px-6 text-slate-300 font-medium">{att.quizTitle}</td>
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            att.status === 'submitted' ? 'bg-emerald-500/10 text-emerald-400' :
+                            att.status === 'force_submitted' ? 'bg-cyan-500/10 text-cyan-400' :
+                            att.status === 'expired' ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-blue-500/10 text-blue-400'
+                          }`}>
+                            {att.status.replace('_', ' ')}
                           </span>
-                        ) : '-'}
-                      </td>
-                      <td className="py-4 px-6 text-right flex items-center justify-end gap-2">
-                        {att.status === 'in_progress' ? (
-                          <button
-                            onClick={() => handleForceSubmit(att.id)}
-                            disabled={isActionLoading}
-                            title="Force submit session"
-                            className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-1.5 text-xs font-semibold text-cyan-400 hover:bg-cyan-500 hover:text-white transition disabled:opacity-50"
-                          >
-                            <Zap className="h-3.5 w-3.5" />
-                            <span>Force Submit</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => loadAttemptDetail(att.id)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:bg-blue-600 hover:text-white transition"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            <span>Evaluate</span>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold ${att.safeModeViolations > 0 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-slate-500'}`}>
+                            {att.safeModeViolations}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right font-bold">
+                          {att.score !== null ? (
+                            <span className={isPass ? 'text-emerald-400' : 'text-rose-400'}>
+                              {att.score}%
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="py-4 px-6 text-right flex items-center justify-end gap-2">
+                          {att.status === 'in_progress' ? (
+                            <button
+                              onClick={() => handleForceSubmit(att.id)}
+                              disabled={isActionLoading}
+                              title="Force submit session"
+                              className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-1.5 text-xs font-semibold text-cyan-400 hover:bg-cyan-500 hover:text-white transition disabled:opacity-50"
+                            >
+                              <Zap className="h-3.5 w-3.5" />
+                              <span>Force Submit</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => loadAttemptDetail(att.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-blue-400 hover:bg-blue-600 hover:text-white transition"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Evaluate</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* Pagination UI */}
+          {totalAttempts > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
+              <div>
+                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                <span className="font-semibold text-white">
+                  {Math.min(currentPage * itemsPerPage, totalAttempts)}
+                </span>{' '}
+                of <span className="font-semibold text-white">{totalAttempts}</span> attempts
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Previous
+                  </button>
+                  
+                  {renderPageNumbers()}
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">

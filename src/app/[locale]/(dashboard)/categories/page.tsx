@@ -56,6 +56,15 @@ export default function CategoriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCategories, setTotalCategories] = useState(0);
+  const itemsPerPage = 10;
+
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   // Tree collapse state (category id -> collapsed boolean)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -84,13 +93,32 @@ export default function CategoriesPage() {
 
   const watchParentId = watch('parent_id');
 
-  const loadCategories = async () => {
-    setIsLoading(true);
-    setError(null);
+  const loadAllCategories = async () => {
     try {
       const res = await apiClient('/api/admin/categories');
       const data = res?.data || res;
-      setCategories(Array.isArray(data) ? data : []);
+      setAllCategories(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load all categories', err);
+    }
+  };
+
+  const loadCategories = async (page = 1, searchQuery = '') => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      const res = await apiClient(`/api/admin/categories?${params.toString()}`);
+      const data = res?.data || res;
+      setCategories(data?.categories || []);
+      setTotalCategories(data?.pagination?.total || 0);
+      setTotalPages(Math.ceil((data?.pagination?.total || 0) / itemsPerPage));
     } catch (err: any) {
       setError(err?.message || 'Failed to load categories');
     } finally {
@@ -98,9 +126,30 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
-    loadCategories();
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  useEffect(() => {
+    loadCategories(currentPage, debouncedSearch);
+  }, [currentPage, debouncedSearch]);
+
+  useEffect(() => {
+    loadAllCategories();
   }, []);
+
+  const handleCategoriesUpdate = () => {
+    loadCategories(currentPage, debouncedSearch);
+    loadAllCategories();
+  };
 
   const toggleCollapse = (id: string) => {
     setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -143,7 +192,7 @@ export default function CategoriesPage() {
         });
       }
       setIsModalOpen(false);
-      loadCategories();
+      handleCategoriesUpdate();
     } catch (err: any) {
       alert(err?.message || 'Failed to save category');
     } finally {
@@ -157,7 +206,7 @@ export default function CategoriesPage() {
       return;
     }
 
-    const hasChildren = categories.some((c) => c.parent_id === category.id);
+    const hasChildren = allCategories.some((c) => c.parent_id === category.id);
     const message = hasChildren 
       ? `Are you sure you want to delete '${category.name}'? All child categories will be unparented (moved to root), and quizzes under this category will become Uncategorized.`
       : `Are you sure you want to delete '${category.name}'? Quizzes under this category will become Uncategorized.`;
@@ -168,7 +217,7 @@ export default function CategoriesPage() {
       await apiClient(`/api/admin/categories/${category.id}`, {
         method: 'DELETE',
       });
-      loadCategories();
+      handleCategoriesUpdate();
     } catch (err: any) {
       alert(err?.message || 'Failed to delete category');
     }
@@ -177,7 +226,7 @@ export default function CategoriesPage() {
   // Reorder siblings
   const handleReorder = async (category: Category, direction: 'up' | 'down') => {
     // Find siblings (same parent_id)
-    const siblings = categories.filter((c) => c.parent_id === category.parent_id);
+    const siblings = allCategories.filter((c) => c.parent_id === category.parent_id);
     const index = siblings.findIndex((c) => c.id === category.id);
     if (index === -1) return;
 
@@ -197,7 +246,7 @@ export default function CategoriesPage() {
         method: 'PATCH',
         body: JSON.stringify({ orders }),
       });
-      loadCategories();
+      handleCategoriesUpdate();
     } catch (err: any) {
       alert(err?.message || 'Failed to reorder categories');
     }
@@ -249,7 +298,7 @@ export default function CategoriesPage() {
       setIsImportModalOpen(false);
       setImportFile(null);
       setImportPreview([]);
-      loadCategories();
+      handleCategoriesUpdate();
     } catch (err: any) {
       // Backend returns validation error array in details if present
       if (err.message.includes('validation failed') || err.message.includes('CSV')) {
@@ -273,11 +322,7 @@ export default function CategoriesPage() {
   };
 
   // Filter Categories by search query
-  const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.slug.toLowerCase().includes(search.toLowerCase()) ||
-    (c.description && c.description.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredCategories = categories;
 
   // Expand parents if search query is active
   const isSearching = search.trim().length > 0;
@@ -290,7 +335,7 @@ export default function CategoriesPage() {
       if (collapsed[currentParentId]) {
         return false;
       }
-      const parent = categories.find((c) => c.id === currentParentId);
+      const parent = allCategories.find((c) => c.id === currentParentId);
       currentParentId = parent ? parent.parent_id : null;
     }
     return true;
@@ -298,15 +343,44 @@ export default function CategoriesPage() {
 
   // Get children count
   const getChildrenCount = (id: string) => {
-    return categories.filter((c) => c.parent_id === id).length;
+    return allCategories.filter((c) => c.parent_id === id).length;
   };
 
   // Candidates for parent selection: prevent circular dependency by excluding editing category and its descendants!
   const getParentOptions = () => {
-    if (!editingCategory) return categories;
-    return categories.filter(
+    if (!editingCategory) return allCategories;
+    return allCategories.filter(
       (c) => c.id !== editingCategory.id && !c.path.startsWith(editingCategory.path)
     );
+  };
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      if (i >= 1) pages.push(i);
+    }
+    
+    return pages.map(page => (
+      <button
+        key={page}
+        onClick={() => setCurrentPage(page)}
+        className={`rounded-xl px-3 py-1.5 font-bold transition ${
+          currentPage === page
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+            : 'border border-slate-900 bg-slate-900/40 text-slate-400 hover:bg-slate-900 hover:text-white'
+        }`}
+      >
+        {page}
+      </button>
+    ));
   };
 
   return (
@@ -346,7 +420,7 @@ export default function CategoriesPage() {
           type="text"
           placeholder="Search categories by name, slug..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
         />
       </div>
@@ -383,7 +457,7 @@ export default function CategoriesPage() {
                   .map((category) => {
                     const childrenCount = getChildrenCount(category.id);
                     const isCollapsed = collapsed[category.id];
-                    const siblings = categories.filter((c) => c.parent_id === category.parent_id);
+                    const siblings = allCategories.filter((c) => c.parent_id === category.parent_id);
                     const siblingIdx = siblings.findIndex((c) => c.id === category.id);
                     const canMoveUp = siblingIdx > 0;
                     const canMoveDown = siblingIdx < siblings.length - 1;
@@ -497,6 +571,41 @@ export default function CategoriesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination UI */}
+          {totalCategories > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 p-6 text-sm text-slate-400 bg-slate-950/10">
+              <div>
+                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                <span className="font-semibold text-white">
+                  {Math.min(currentPage * itemsPerPage, totalCategories)}
+                </span>{' '}
+                of <span className="font-semibold text-white">{totalCategories}</span> categories
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Previous
+                  </button>
+                  
+                  {renderPageNumbers()}
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500 bg-slate-900/5 backdrop-blur-xl">

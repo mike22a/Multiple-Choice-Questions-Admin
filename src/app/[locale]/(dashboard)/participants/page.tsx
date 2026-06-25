@@ -76,6 +76,12 @@ export default function ParticipantsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalParticipants, setTotalParticipants] = useState(0);
+  const itemsPerPage = 10;
+
   // Form Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
@@ -106,12 +112,21 @@ export default function ParticipantsPage() {
     resolver: zodResolver(participantSchema),
   });
 
-  const loadParticipants = async () => {
+  const loadParticipants = async (page = 1, searchQuery = '') => {
     setIsLoading(true);
     try {
-      const res = await apiClient('/api/admin/users');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      const res = await apiClient(`/api/admin/users?${params.toString()}`);
       const data = res?.data || res;
       setParticipants(data?.participants || []);
+      setTotalParticipants(data?.pagination?.total || 0);
+      setTotalPages(Math.ceil((data?.pagination?.total || 0) / itemsPerPage));
     } catch (err: any) {
       setError(err?.message || 'Failed to load participants');
     } finally {
@@ -120,8 +135,16 @@ export default function ParticipantsPage() {
   };
 
   useEffect(() => {
-    loadParticipants();
-  }, []);
+    const delayDebounce = setTimeout(() => {
+      loadParticipants(currentPage, search);
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [currentPage, search]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
 
   const openCreateModal = () => {
     reset({
@@ -250,11 +273,36 @@ export default function ParticipantsPage() {
     }
   };
 
-  const filteredParticipants = participants.filter(p => 
-    p.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase()) ||
-    p.username.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredParticipants = participants;
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      if (i >= 1) pages.push(i);
+    }
+    
+    return pages.map(page => (
+      <button
+        key={page}
+        onClick={() => setCurrentPage(page)}
+        className={`rounded-xl px-3 py-1.5 font-bold transition ${
+          currentPage === page
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+            : 'border border-slate-900 bg-slate-900/40 text-slate-400 hover:bg-slate-900 hover:text-white'
+        }`}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   return (
     <div className="space-y-8">
@@ -348,7 +396,7 @@ export default function ParticipantsPage() {
           type="text"
           placeholder="Search name, username, or email..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
         />
       </div>
@@ -366,50 +414,87 @@ export default function ParticipantsPage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-500" />
         </div>
       ) : filteredParticipants.length > 0 ? (
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-950/20">
-                  <th className="py-4 px-6">Name</th>
-                  <th className="py-4 px-6">Username</th>
-                  <th className="py-4 px-6">Email</th>
-                  <th className="py-4 px-6">Locale</th>
-                  <th className="py-4 px-6">Status</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-900/60">
-                {filteredParticipants.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-900/20 transition">
-                    <td className="py-4 px-6 font-semibold text-white">{user.fullName}</td>
-                    <td className="py-4 px-6 text-slate-300">{user.username}</td>
-                    <td className="py-4 px-6 text-slate-400">{user.email}</td>
-                    <td className="py-4 px-6 text-slate-400 uppercase">{user.locale}</td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${user.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                        {user.isActive ? 'Active' : 'Deactivated'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <button
-                        onClick={() => openCategoryAccessModal(user)}
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold border border-blue-500/20 text-blue-400 hover:bg-blue-500/10 mr-2 transition"
-                      >
-                        Category Access
-                      </button>
-                      <button
-                        onClick={() => toggleStatus(user)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${user.isActive ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
-                      >
-                        {user.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </td>
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/10 backdrop-blur-xl overflow-hidden w-full min-w-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-900 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-950/20">
+                    <th className="py-4 px-6">Name</th>
+                    <th className="py-4 px-6">Username</th>
+                    <th className="py-4 px-6">Email</th>
+                    <th className="py-4 px-6">Locale</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-900/60">
+                  {filteredParticipants.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-900/20 transition">
+                      <td className="py-4 px-6 font-semibold text-white">{user.fullName}</td>
+                      <td className="py-4 px-6 text-slate-300">{user.username}</td>
+                      <td className="py-4 px-6 text-slate-400">{user.email}</td>
+                      <td className="py-4 px-6 text-slate-400 uppercase">{user.locale}</td>
+                      <td className="py-4 px-6">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${user.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                          {user.isActive ? 'Active' : 'Deactivated'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <button
+                          onClick={() => openCategoryAccessModal(user)}
+                          className="rounded-lg px-3 py-1.5 text-xs font-semibold border border-blue-500/20 text-blue-400 hover:bg-blue-500/10 mr-2 transition"
+                        >
+                          Category Access
+                        </button>
+                        <button
+                          onClick={() => toggleStatus(user)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${user.isActive ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10' : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'}`}
+                        >
+                          {user.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* Pagination UI */}
+          {totalParticipants > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
+              <div>
+                Showing <span className="font-semibold text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                <span className="font-semibold text-white">
+                  {Math.min(currentPage * itemsPerPage, totalParticipants)}
+                </span>{' '}
+                of <span className="font-semibold text-white">{totalParticipants}</span> candidates
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Previous
+                  </button>
+                  
+                  {renderPageNumbers()}
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-xl border border-slate-900 bg-slate-900/40 px-3.5 py-2.5 font-semibold text-slate-300 hover:bg-slate-900 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500">
