@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,7 +19,11 @@ import {
   HelpCircle,
   Building,
   UserPlus,
-  Users
+  Users,
+  Trash2,
+  RotateCcw,
+  FileText,
+  Layers
 } from 'lucide-react';
 
 const profileSchema = z.object({
@@ -35,10 +39,37 @@ export default function SettingsPage() {
   const tSet = useTranslations('Settings');
   
   const { profile, setAuth } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'trash'>('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Trash bin states
+  const [trashData, setTrashData] = useState<{ quizzes: any[]; questions: any[] }>({ quizzes: [], questions: [] });
+  const [isTrashLoading, setIsTrashLoading] = useState(false);
+  const [trashSubTab, setTrashSubTab] = useState<'quizzes' | 'questions'>('quizzes');
+
+  const loadTrashData = async () => {
+    setIsTrashLoading(true);
+    try {
+      const res = await apiClient('/api/admin/trash');
+      const data = res?.data || res;
+      setTrashData({
+        quizzes: data?.quizzes || [],
+        questions: data?.questions || [],
+      });
+    } catch (err: any) {
+      console.error('Failed to load trash data', err);
+    } finally {
+      setIsTrashLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'trash') {
+      loadTrashData();
+    }
+  }, [activeTab]);
 
   // Helper for premium dark theme sweet alerts
   const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
@@ -56,6 +87,78 @@ export default function SettingsPage() {
         confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
       }
     });
+  };
+
+  const handleRestore = async (type: 'quiz' | 'question', id: string, name: string) => {
+    const result = await Swal.fire({
+      title: tSet('restoreTitle') || 'Restore Content?',
+      text: (tSet('restoreConfirm') || 'Are you sure you want to restore "{name}"?').replace('{name}', name),
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#475569',
+      confirmButtonText: tc('confirm') || 'Confirm',
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await apiClient('/api/admin/trash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, action: 'restore', id }),
+        });
+        showSwalAlert(tc('success') || 'Success', tSet('restoreSuccess') || 'Content restored successfully', 'success');
+        loadTrashData();
+      } catch (err: any) {
+        showSwalAlert(tc('error') || 'Error', err.message || 'Failed to restore content', 'error');
+      }
+    }
+  };
+
+  const handleDeleteForever = async (type: 'quiz' | 'question', id: string, name: string) => {
+    const result = await Swal.fire({
+      title: tSet('deleteForeverTitle') || 'Delete Permanently?',
+      text: (tSet('deleteForeverConfirm') || 'Are you sure you want to permanently delete "{name}"? This action CANNOT be undone.').replace('{name}', name),
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#475569',
+      confirmButtonText: tSet('deleteForeverBtn') || 'Delete Permanently',
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold bg-rose-600 hover:bg-rose-500',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await apiClient('/api/admin/trash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, action: 'delete', id }),
+        });
+        showSwalAlert(tc('success') || 'Success', tSet('deleteForeverSuccess') || 'Content deleted permanently', 'success');
+        loadTrashData();
+      } catch (err: any) {
+        showSwalAlert(tc('error') || 'Error', err.message || 'Failed to delete content permanently', 'error');
+      }
+    }
   };
 
   const {
@@ -113,6 +216,12 @@ export default function SettingsPage() {
             {tSet('adminsRegistry')}
           </button>
         )}
+        <button
+          onClick={() => setActiveTab('trash')}
+          className={`pb-2 text-sm font-semibold border-b-2 transition ${activeTab === 'trash' ? 'border-blue-500 text-white font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+        >
+          {tSet('trashBin') || 'Trash Bin'}
+        </button>
       </div>
 
       {/* Profile settings Tab */}
@@ -260,6 +369,158 @@ export default function SettingsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trash Bin settings tab */}
+      {activeTab === 'trash' && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-6 backdrop-blur-xl space-y-6 w-full min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-950 pb-4">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setTrashSubTab('quizzes')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${trashSubTab === 'quizzes' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white border border-transparent'}`}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>{tSet('deletedQuizzes') || 'Quizzes'} ({trashData.quizzes.length})</span>
+                </button>
+                <button
+                  onClick={() => setTrashSubTab('questions')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${trashSubTab === 'questions' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white border border-transparent'}`}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>{tSet('deletedQuestions') || 'Questions'} ({trashData.questions.length})</span>
+                </button>
+              </div>
+              <button
+                onClick={loadTrashData}
+                disabled={isTrashLoading}
+                className="text-xs text-slate-400 hover:text-white transition disabled:opacity-50"
+              >
+                {tSet('refresh') || 'Refresh'}
+              </button>
+            </div>
+
+            {isTrashLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                <span className="text-sm text-slate-400">{tSet('loadingTrash') || 'Loading trash...'}</span>
+              </div>
+            ) : trashSubTab === 'quizzes' ? (
+              trashData.quizzes.length === 0 ? (
+                <div className="text-center py-16 space-y-3">
+                  <Trash2 className="mx-auto h-12 w-12 text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-400">{tSet('emptyQuizzes') || 'No deleted quizzes found'}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto text-sm text-left">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-900 text-xs font-semibold uppercase text-slate-500">
+                        <th className="pb-3 pr-4">{tSet('quizTitleCol') || 'Quiz Title'}</th>
+                        <th className="pb-3 px-4">{tSet('questionsCountCol') || 'Questions'}</th>
+                        <th className="pb-3 px-4">{tSet('attemptsCountCol') || 'Attempts'}</th>
+                        <th className="pb-3 px-4">{tSet('deletedAtCol') || 'Deleted At'}</th>
+                        <th className="pb-3 pl-4 text-right">{tSet('actionsCol') || 'Actions'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900/40 text-slate-300">
+                      {trashData.quizzes.map((quiz) => (
+                        <tr key={quiz.id} className="hover:bg-slate-950/20 transition-colors">
+                          <td className="py-4 pr-4 font-bold text-white max-w-xs truncate">{quiz.title}</td>
+                          <td className="py-4 px-4 text-slate-400 font-mono">{quiz.question_count}</td>
+                          <td className="py-4 px-4">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-mono font-semibold ${quiz.attempt_count > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
+                              {quiz.attempt_count}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-slate-400">
+                            {quiz.deleted_at ? new Date(quiz.deleted_at).toLocaleString() : '-'}
+                          </td>
+                          <td className="py-4 pl-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleRestore('quiz', quiz.id, quiz.title)}
+                                className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/10 transition"
+                                title="Restore"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                <span>{tSet('restoreBtn') || 'Restore'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteForever('quiz', quiz.id, quiz.title)}
+                                className="flex items-center gap-1 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/10 px-2.5 py-1.5 rounded-lg border border-rose-500/10 transition"
+                                title="Delete Forever"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>{tSet('deleteForeverBtnShort') || 'Delete Forever'}</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : trashData.questions.length === 0 ? (
+              <div className="text-center py-16 space-y-3">
+                <Trash2 className="mx-auto h-12 w-12 text-slate-600" />
+                <p className="text-sm font-semibold text-slate-400">{tSet('emptyQuestions') || 'No deleted questions found'}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto text-sm text-left">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-900 text-xs font-semibold uppercase text-slate-500">
+                      <th className="pb-3 pr-4">{tSet('questionTextCol') || 'Question Text'}</th>
+                      <th className="pb-3 px-4">{tSet('quizCol') || 'Quiz'}</th>
+                      <th className="pb-3 px-4">{tSet('responsesCountCol') || 'Responses'}</th>
+                      <th className="pb-3 px-4">{tSet('deletedAtCol') || 'Deleted At'}</th>
+                      <th className="pb-3 pl-4 text-right">{tSet('actionsCol') || 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-900/40 text-slate-300">
+                    {trashData.questions.map((q) => (
+                      <tr key={q.id} className="hover:bg-slate-950/20 transition-colors">
+                        <td className="py-4 pr-4 font-bold text-white max-w-sm truncate">{q.question_text}</td>
+                        <td className="py-4 px-4 text-slate-400 truncate max-w-xs">{q.quiz_title}</td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-mono font-semibold ${q.response_count > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
+                            {q.response_count}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-slate-400">
+                          {q.deleted_at ? new Date(q.deleted_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="py-4 pl-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleRestore('question', q.id, q.question_text)}
+                              className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/10 transition"
+                              title="Restore"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>{tSet('restoreBtn') || 'Restore'}</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteForever('question', q.id, q.question_text)}
+                              className="flex items-center gap-1 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/5 hover:bg-rose-500/10 px-2.5 py-1.5 rounded-lg border border-rose-500/10 transition"
+                              title="Delete Forever"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>{tSet('deleteForeverBtnShort') || 'Delete Forever'}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
