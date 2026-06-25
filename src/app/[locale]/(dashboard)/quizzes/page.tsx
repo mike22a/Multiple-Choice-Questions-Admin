@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useRouter, Link } from '@/navigation';
 import { useTranslations } from 'next-intl';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   BookOpen, 
   Plus, 
@@ -110,6 +112,46 @@ export default function QuizzesPage() {
   const [importErrors, setImportErrors] = useState<any[]>([]);
   const quizFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
+  const showSwalConfirm = (title: string, text: string, confirmButtonText = tc('delete') || 'Delete') => {
+    return Swal.fire({
+      title,
+      text,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#dc2626', // red-600
+      cancelButtonColor: '#334155', // slate-700
+      confirmButtonText,
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
   const {
     register,
     handleSubmit,
@@ -159,7 +201,7 @@ export default function QuizzesPage() {
       setQuickCategoryQuiz(null);
       loadQuizzes(currentPage, search);
     } catch (err: any) {
-      alert(err.message || 'Failed to update category');
+      showSwalAlert(tc('error') || 'Error', err.message || 'Failed to update category', 'error');
     } finally {
       setIsSubmitLoading(false);
     }
@@ -326,6 +368,7 @@ export default function QuizzesPage() {
       setImportFile(null);
       setImportPreview([]);
       loadQuizzes();
+      showSwalAlert(tc('success') || 'Success', tQuiz('importSuccess') || 'Quizzes imported successfully', 'success');
     } catch (err: any) {
       setImportErrors([{ error: err.message || tQuiz('failedImport') }]);
     } finally {
@@ -401,20 +444,23 @@ export default function QuizzesPage() {
 
       setIsModalOpen(false);
       loadQuizzes();
+      showSwalAlert(tc('success') || 'Success', editingQuiz ? tQuiz('saveSuccess') || 'Quiz saved successfully' : tQuiz('createSuccess') || 'Quiz created successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tQuiz('failedSave'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tQuiz('failedSave'), 'error');
     } finally {
       setIsSubmitLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(tQuiz('deleteConfirm'))) return;
+    const result = await showSwalConfirm(tQuiz('deleteConfirmTitle') || tc('delete') || 'Delete', tQuiz('deleteConfirm') || 'Are you sure?');
+    if (!result.isConfirmed) return;
     try {
       await apiClient(`/api/admin/quizzes/${id}`, { method: 'DELETE' });
       loadQuizzes();
+      showSwalAlert(tc('success') || 'Success', tQuiz('deleteSuccess') || 'Quiz deleted successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tQuiz('failedDelete'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tQuiz('failedDelete'), 'error');
     }
   };
 
@@ -427,8 +473,9 @@ export default function QuizzesPage() {
       const data = res?.data || res;
       // update state locally
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, is_published: data.is_published } : q));
+      showSwalAlert(tc('success') || 'Success', data.is_published ? tQuiz('publishSuccess') || 'Quiz published successfully' : tQuiz('unpublishSuccess') || 'Quiz unpublished successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tQuiz('failedTogglePublish'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tQuiz('failedTogglePublish'), 'error');
     }
   };
 
@@ -440,8 +487,9 @@ export default function QuizzesPage() {
       });
       const data = res?.data || res;
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, safe_mode: data.safe_mode } : q));
+      showSwalAlert(tc('success') || 'Success', data.safe_mode ? tQuiz('safeModeEnabled') || 'Safe mode enabled' : tQuiz('safeModeDisabled') || 'Safe mode disabled', 'success');
     } catch (err: any) {
-      alert(err?.message || tQuiz('failedToggleSafeMode'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tQuiz('failedToggleSafeMode'), 'error');
     }
   };
 

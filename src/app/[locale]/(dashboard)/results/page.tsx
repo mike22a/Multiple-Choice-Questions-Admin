@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { useTranslations } from 'next-intl';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   BarChart3, 
   Search, 
@@ -104,6 +106,46 @@ export default function ResultsPage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
+  const showSwalConfirm = (title: string, text: string, confirmButtonText = 'Submit') => {
+    return Swal.fire({
+      title,
+      text,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#2563eb', // blue-600
+      cancelButtonColor: '#334155', // slate-700
+      confirmButtonText,
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
   const loadQuizzes = async () => {
     try {
       const quizListRes = await apiClient('/api/admin/quizzes?limit=100');
@@ -184,7 +226,7 @@ export default function ResultsPage() {
       const res = await apiClient(`/api/admin/attempts/${id}`);
       setAttemptDetail(res?.data || res);
     } catch (err: any) {
-      alert(err?.message || 'Failed to load attempt details');
+      showSwalAlert(tc('error') || 'Error', err?.message || 'Failed to load attempt details', 'error');
       setSelectedAttemptId(null);
     } finally {
       setIsDetailLoading(false);
@@ -192,7 +234,12 @@ export default function ResultsPage() {
   };
 
   const handleForceSubmit = async (id: string) => {
-    if (!confirm('Are you sure you want to force-submit this active quiz session? It will grade their current Redis draft.')) return;
+    const result = await showSwalConfirm(
+      'Force Submit Attempt',
+      'Are you sure you want to force-submit this active quiz session? It will grade their current Redis draft.',
+      'Force Submit'
+    );
+    if (!result.isConfirmed) return;
     setIsActionLoading(true);
     try {
       await apiClient(`/api/admin/attempts/${id}/force-submit`, { method: 'POST' });
@@ -200,8 +247,9 @@ export default function ResultsPage() {
       if (selectedAttemptId === id) {
         loadAttemptDetail(id);
       }
+      showSwalAlert(tc('success') || 'Success', 'Session force-submitted and graded successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || 'Failed to force submit');
+      showSwalAlert(tc('error') || 'Error', err?.message || 'Failed to force submit', 'error');
     } finally {
       setIsActionLoading(false);
     }

@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useTranslations } from 'next-intl';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   Users, 
   Plus, 
@@ -104,6 +106,46 @@ export default function ParticipantsPage() {
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
   const [isAccessActionLoading, setIsAccessActionLoading] = useState<string | null>(null);
 
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
+  const showSwalConfirm = (title: string, text: string, confirmButtonText = 'Confirm') => {
+    return Swal.fire({
+      title,
+      text,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#2563eb', // blue-600
+      cancelButtonColor: '#334155', // slate-700
+      confirmButtonText,
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
   const {
     register,
     handleSubmit,
@@ -168,7 +210,7 @@ export default function ParticipantsPage() {
       setIsModalOpen(false);
       loadParticipants();
     } catch (err: any) {
-      alert(err?.message || tPart('failedRegister'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tPart('failedRegister'), 'error');
     } finally {
       setIsSubmitLoading(false);
     }
@@ -182,8 +224,9 @@ export default function ParticipantsPage() {
       });
       const data = res?.data || res;
       setParticipants(participants.map(p => p.id === user.id ? { ...p, isActive: data.isActive } : p));
+      showSwalAlert(tc('success') || 'Success', data.isActive ? 'Participant activated successfully' : 'Participant deactivated successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tPart('failedToggleStatus'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tPart('failedToggleStatus'), 'error');
     }
   };
 
@@ -209,7 +252,7 @@ export default function ParticipantsPage() {
       const data = res?.data || res;
       setUserAccessList(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      alert(err?.message || tPart('failedLoadAccess'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tPart('failedLoadAccess'), 'error');
     } finally {
       setIsLoadingAccess(false);
     }
@@ -237,7 +280,7 @@ export default function ParticipantsPage() {
       const data = res?.data || res;
       setUserAccessList(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      alert(err?.message || tPart('failedUpdateAccess'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tPart('failedUpdateAccess'), 'error');
     } finally {
       setIsAccessActionLoading(null);
     }
@@ -265,8 +308,9 @@ export default function ParticipantsPage() {
       });
       setImportResult(result);
       loadParticipants();
+      showSwalAlert(tc('success') || 'Success', `Import finished: ${result.successCount} succeeded, ${result.failureCount} failed`, 'success');
     } catch (err: any) {
-      alert(err?.message || tPart('failedImport'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tPart('failedImport'), 'error');
     } finally {
       setIsImporting(false);
       // Reset input value so same file can be selected again

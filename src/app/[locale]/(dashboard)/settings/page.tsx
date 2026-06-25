@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/api-client';
 import { useTranslations } from 'next-intl';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   Settings, 
   User, 
@@ -37,6 +39,24 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
 
   const {
     register,
@@ -194,7 +214,7 @@ export default function SettingsPage() {
                 <span>{tSet('registryTitle')}</span>
               </h2>
               <button
-                onClick={() => alert(tSet('registerAdminAlert'))}
+                onClick={() => showSwalAlert(tSet('registerAdmin') || 'Register Admin', tSet('registerAdminAlert'), 'info')}
                 className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition"
               >
                 <UserPlus className="h-3.5 w-3.5" />

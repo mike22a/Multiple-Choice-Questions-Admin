@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiClient } from '@/lib/api-client';
 import { useTranslations } from 'next-intl';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import { 
   FolderTree, 
   Plus, 
@@ -96,6 +98,46 @@ export default function CategoriesPage() {
   });
 
   const watchParentId = watch('parent_id');
+
+  // Helper for premium dark theme sweet alerts
+  const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+    return Swal.fire({
+      title,
+      text,
+      icon,
+      background: '#0f172a', // slate-900
+      color: '#f8fafc', // slate-50
+      confirmButtonColor: '#2563eb', // blue-600
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
+
+  const showSwalConfirm = (title: string, text: string, confirmButtonText = tc('delete') || 'Delete') => {
+    return Swal.fire({
+      title,
+      text,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0f172a',
+      color: '#f8fafc',
+      confirmButtonColor: '#dc2626', // red-600
+      cancelButtonColor: '#334155', // slate-700
+      confirmButtonText,
+      cancelButtonText: tc('cancel') || 'Cancel',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'text-lg font-bold text-white',
+        htmlContainer: 'text-sm text-slate-400',
+        confirmButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold',
+        cancelButton: 'rounded-xl px-5 py-2.5 text-sm font-semibold'
+      }
+    });
+  };
 
   const loadAllCategories = async () => {
     try {
@@ -197,8 +239,9 @@ export default function CategoriesPage() {
       }
       setIsModalOpen(false);
       handleCategoriesUpdate();
+      showSwalAlert(tc('success') || 'Success', editingCategory ? tCat('saveSuccess') || 'Category saved successfully' : tCat('createSuccess') || 'Category created successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tCat('failedSave'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tCat('failedSave'), 'error');
     } finally {
       setIsSubmitLoading(false);
     }
@@ -206,7 +249,7 @@ export default function CategoriesPage() {
 
   const handleDelete = async (category: Category) => {
     if (category.is_system) {
-      alert(tCat('systemDeleteAlert'));
+      showSwalAlert(tc('error') || 'Error', tCat('systemDeleteAlert'), 'error');
       return;
     }
 
@@ -215,15 +258,17 @@ export default function CategoriesPage() {
       ? tCat('deleteWithChildrenAlert', { name: category.name })
       : tCat('deleteCategoryAlert', { name: category.name });
 
-    if (!confirm(message)) return;
+    const result = await showSwalConfirm(tCat('deleteConfirmTitle') || tc('delete') || 'Delete', message);
+    if (!result.isConfirmed) return;
 
     try {
       await apiClient(`/api/admin/categories/${category.id}`, {
         method: 'DELETE',
       });
       handleCategoriesUpdate();
+      showSwalAlert(tc('success') || 'Success', tCat('deleteSuccess') || 'Category deleted successfully', 'success');
     } catch (err: any) {
-      alert(err?.message || tCat('failedDelete'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tCat('failedDelete'), 'error');
     }
   };
 
@@ -252,7 +297,7 @@ export default function CategoriesPage() {
       });
       handleCategoriesUpdate();
     } catch (err: any) {
-      alert(err?.message || tCat('failedReorder'));
+      showSwalAlert(tc('error') || 'Error', err?.message || tCat('failedReorder'), 'error');
     }
   };
 
@@ -303,6 +348,7 @@ export default function CategoriesPage() {
       setImportFile(null);
       setImportPreview([]);
       handleCategoriesUpdate();
+      showSwalAlert(tc('success') || 'Success', tCat('importSuccess') || 'Categories imported successfully', 'success');
     } catch (err: any) {
       // Backend returns validation error array in details if present
       if (err.message.includes('validation failed') || err.message.includes('CSV')) {
