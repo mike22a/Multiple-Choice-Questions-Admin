@@ -74,7 +74,20 @@ export default function SettingsPage() {
     }
   };
 
+  // Sync URL hash with activeTab state
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (hash === 'profile' || hash === 'system' || hash === 'trash') {
+        setActiveTab(hash as 'profile' | 'system' | 'trash');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = activeTab;
+    }
     if (activeTab === 'trash') {
       loadTrashData();
     }
