@@ -240,10 +240,12 @@ export default function ResultsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">{tRes('title')}</h1>
-        <p className="mt-2 text-slate-400">{tRes('subtitle')}</p>
+      {/* Sticky Header wrapper */}
+      <div className="sticky top-16 z-30 bg-slate-950/90 -mx-6 px-6 py-5 md:-mx-8 md:px-8 -mt-6 lg:-mt-8 border-b border-slate-900 backdrop-blur-md flex flex-col gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">{tRes('title')}</h1>
+          <p className="mt-2 text-slate-400 text-xs sm:text-sm">{tRes('subtitle')}</p>
+        </div>
       </div>
 
       {/* Metrics Row */}
@@ -392,7 +394,7 @@ export default function ResultsPage() {
 
           {/* Pagination UI */}
           {totalAttempts > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900 pt-6 text-sm text-slate-400">
+            <div className="sticky bottom-16 lg:bottom-0 z-30 bg-slate-950/90 -mx-6 px-6 py-4 md:-mx-8 md:px-8 border-t border-slate-900 backdrop-blur-md mt-8 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-400">
               <div>
                 {tc('showingRange', { start: (currentPage - 1) * itemsPerPage + 1, end: Math.min(currentPage * itemsPerPage, totalAttempts), total: totalAttempts })}
               </div>
