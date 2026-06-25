@@ -74,24 +74,38 @@ export default function SettingsPage() {
     }
   };
 
-  // Sync URL hash with activeTab state
+  // Sync URL hash with activeTab state using unidirectional event routing
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.replace('#', '');
-      if (hash === 'profile' || hash === 'system' || hash === 'trash') {
-        setActiveTab(hash as 'profile' | 'system' | 'trash');
+    const handleHashChange = () => {
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === 'profile' || hash === 'system' || hash === 'trash') {
+          setActiveTab(hash as 'profile' | 'system' | 'trash');
+        } else {
+          window.location.hash = 'profile';
+        }
       }
-    }
+    };
+
+    handleHashChange();
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.location.hash = activeTab;
-    }
     if (activeTab === 'trash') {
       loadTrashData();
     }
   }, [activeTab]);
+
+  const handleTabChange = (tab: 'profile' | 'system' | 'trash') => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = tab;
+    }
+  };
 
   // Helper for premium dark theme sweet alerts
   const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
@@ -317,21 +331,21 @@ export default function SettingsPage() {
       {/* Tabs */}
       <div className="flex gap-4 border-b border-slate-900 pb-2">
         <button
-          onClick={() => setActiveTab('profile')}
+          onClick={() => handleTabChange('profile')}
           className={`pb-2 text-sm font-semibold border-b-2 transition ${activeTab === 'profile' ? 'border-blue-500 text-white font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
         >
           {tSet('myProfile')}
         </button>
         {isSuperadmin && (
           <button
-            onClick={() => setActiveTab('system')}
+            onClick={() => handleTabChange('system')}
             className={`pb-2 text-sm font-semibold border-b-2 transition ${activeTab === 'system' ? 'border-blue-500 text-white font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
           >
             {tSet('adminsRegistry')}
           </button>
         )}
         <button
-          onClick={() => setActiveTab('trash')}
+          onClick={() => handleTabChange('trash')}
           className={`pb-2 text-sm font-semibold border-b-2 transition ${activeTab === 'trash' ? 'border-blue-500 text-white font-bold' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
         >
           {tSet('trashBin') || 'Trash Bin'}
