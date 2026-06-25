@@ -171,7 +171,7 @@ export default function DashboardLayout({ children, params: { locale } }: Props)
       </aside>
 
       {/* Main Dashboard Panel */}
-      <div className={`transition-all duration-300 w-full min-w-0 ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
+      <div className={`transition-[padding-left] duration-300 w-full min-w-0 ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Header bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950/70 px-6 backdrop-blur-md">
           <button
