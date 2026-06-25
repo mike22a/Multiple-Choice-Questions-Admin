@@ -203,7 +203,11 @@ export default function SettingsPage() {
         await apiClient('/api/admin/trash', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: trashSubTab, action: 'restore', ids }),
+          body: JSON.stringify({ 
+            type: trashSubTab === 'quizzes' ? 'quiz' : 'question', 
+            action: 'restore', 
+            ids 
+          }),
         });
         showSwalAlert(tc('success') || 'Success', tSet('restoreSuccess') || 'Content restored successfully', 'success');
         loadTrashData();
@@ -244,7 +248,11 @@ export default function SettingsPage() {
         await apiClient('/api/admin/trash', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: trashSubTab, action: 'delete', ids }),
+          body: JSON.stringify({ 
+            type: trashSubTab === 'quizzes' ? 'quiz' : 'question', 
+            action: 'delete', 
+            ids 
+          }),
         });
         showSwalAlert(tc('success') || 'Success', tSet('deleteForeverSuccess') || 'Content deleted permanently', 'success');
         loadTrashData();
