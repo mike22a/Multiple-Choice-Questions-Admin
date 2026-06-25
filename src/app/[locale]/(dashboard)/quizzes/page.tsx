@@ -110,6 +110,7 @@ export default function QuizzesPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importErrors, setImportErrors] = useState<any[]>([]);
+  const [useCsvPoints, setUseCsvPoints] = useState(false);
   const quizFileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper for premium dark theme sweet alerts
@@ -358,6 +359,7 @@ export default function QuizzesPage() {
 
     const formData = new FormData();
     formData.append('file', importFile);
+    formData.append('useCsvPoints', useCsvPoints ? 'true' : 'false');
 
     try {
       await apiClient('/api/admin/quizzes/import', {
@@ -367,6 +369,7 @@ export default function QuizzesPage() {
       setIsImportModalOpen(false);
       setImportFile(null);
       setImportPreview([]);
+      setUseCsvPoints(false);
       loadQuizzes();
       showSwalAlert(tc('success') || 'Success', tQuiz('importSuccess') || 'Quizzes imported successfully', 'success');
     } catch (err: any) {
@@ -970,9 +973,7 @@ export default function QuizzesPage() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* CSV Import Modal */}
+      )}       {/* CSV Import Modal */}
       {isImportModalOpen && (
         <div 
           onClick={() => {
@@ -980,6 +981,7 @@ export default function QuizzesPage() {
             setImportFile(null);
             setImportPreview([]);
             setImportErrors([]);
+            setUseCsvPoints(false);
           }}
           className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
@@ -998,6 +1000,7 @@ export default function QuizzesPage() {
                   setImportFile(null);
                   setImportPreview([]);
                   setImportErrors([]);
+                  setUseCsvPoints(false);
                 }} 
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
               >
@@ -1035,6 +1038,25 @@ export default function QuizzesPage() {
                   {importFile ? importFile.name : tQuiz('clickUpload')}
                 </p>
                 <p className="text-xs text-slate-550 mt-1">{tQuiz('acceptCsvHint')}</p>
+              </div>
+
+              {/* Option Checkbox for Points */}
+              <div className="flex items-start gap-3 bg-slate-950/40 rounded-xl p-3 border border-slate-800">
+                <input
+                  id="useCsvPoints"
+                  type="checkbox"
+                  checked={useCsvPoints}
+                  onChange={(e) => setUseCsvPoints(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-850 text-blue-500 focus:ring-blue-500/30 focus:ring-offset-slate-900 focus:ring-2"
+                />
+                <div className="text-xs">
+                  <label htmlFor="useCsvPoints" className="font-semibold text-slate-200 cursor-pointer select-none">
+                    {tQuiz('useCsvPointsLabel') || 'Gunakan poin dari berkas CSV'}
+                  </label>
+                  <p className="text-slate-400 mt-0.5 leading-relaxed">
+                    {tQuiz('useCsvPointsHint') || 'Secara default (tidak dicentang), total poin kuis disetel ke 100 dan dibagi rata ke semua soal.'}
+                  </p>
+                </div>
               </div>
 
               {/* Preview */}
@@ -1092,6 +1114,7 @@ export default function QuizzesPage() {
                   setImportFile(null);
                   setImportPreview([]);
                   setImportErrors([]);
+                  setUseCsvPoints(false);
                 }}
                 className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 transition"
               >

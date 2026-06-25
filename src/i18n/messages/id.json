@@ -196,6 +196,8 @@
     "quickChangeCategorySub": "Perbarui kategori untuk kuis ini secara langsung.",
     "quickCategorySave": "Perbarui Kategori",
     "uploadQuizCsvHint": "Unggah berkas CSV yang berisi kuis, soal, pilihan jawaban, dan pemetaan kebenaran.",
+    "useCsvPointsLabel": "Gunakan poin dari berkas CSV",
+    "useCsvPointsHint": "Secara default (tidak dicentang), total poin kuis disetel ke 100 dan dibagi rata ke semua soal.",
     "acceptCsvHint": "Hanya menerima file .csv",
     "titleCol": "Judul",
     "categoryCol": "Kategori",

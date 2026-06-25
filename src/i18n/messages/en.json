@@ -196,6 +196,8 @@
     "quickChangeCategorySub": "Update the category for this quiz directly.",
     "quickCategorySave": "Update Category",
     "uploadQuizCsvHint": "Upload a CSV file containing quizzes, questions, options, and correctness mappings.",
+    "useCsvPointsLabel": "Use points from CSV file",
+    "useCsvPointsHint": "By default (unchecked), total quiz points will be set to 100 and distributed equally across all questions.",
     "acceptCsvHint": "Accepts only .csv files",
     "titleCol": "Title",
     "categoryCol": "Category",
