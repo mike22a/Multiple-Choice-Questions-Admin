@@ -713,7 +713,7 @@ export default function QuizzesPage() {
       {isModalOpen && (
         <div 
           onClick={() => setIsModalOpen(false)}
-          className="fixed inset-0 z-[9999] modal-backdrop flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -930,7 +930,7 @@ export default function QuizzesPage() {
             setImportPreview([]);
             setImportErrors([]);
           }}
-          className="fixed inset-0 z-[9999] modal-backdrop flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -1068,7 +1068,7 @@ export default function QuizzesPage() {
             setIsQuickCategoryModalOpen(false);
             setQuickCategoryQuiz(null);
           }}
-          className="fixed inset-0 z-[9999] modal-backdrop flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
