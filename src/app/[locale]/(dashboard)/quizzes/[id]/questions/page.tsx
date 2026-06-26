@@ -25,7 +25,10 @@ import {
   Circle,
   Sparkles,
   AlertCircle,
-  Sliders
+  Sliders,
+  BookOpen,
+  Link2,
+  Unlink
 } from 'lucide-react';
 
 const questionSchema = z.object({
@@ -36,6 +39,12 @@ const questionSchema = z.object({
   order_num: z.coerce.number().min(1),
   code_language: z.string().optional().nullable(),
   code_content: z.string().optional().nullable(),
+  passage_id: z.string().uuid().optional().nullable(),
+});
+
+const passageSchema = z.object({
+  title: z.string().optional(),
+  body: z.string().min(1, 'Passage body is required'),
 });
 
 type QuestionFormValues = z.infer<typeof questionSchema>;
@@ -66,6 +75,13 @@ interface QuestionImage {
   order_num: number;
 }
 
+interface Passage {
+  id: string;
+  title: string | null;
+  body: string;
+  order_num: number;
+}
+
 interface Question {
   id: string;
   question_text: string;
@@ -75,6 +91,8 @@ interface Question {
   order_num: number;
   code_language?: string | null;
   code_content?: string | null;
+  passage_id?: string | null;
+  passage?: Passage | null;
   options?: AnswerOption[];
   images?: QuestionImage[];
 }
@@ -87,8 +105,17 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
 
   const [quizTitle, setQuizTitle] = useState('Quiz Questions');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [passages, setPassages] = useState<Passage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Passage modal states
+  const [isPassageModalOpen, setIsPassageModalOpen] = useState(false);
+  const [passageForm, setPassageForm] = useState({ title: '', body: '' });
+  const [passageFormError, setPassageFormError] = useState<string | null>(null);
+  const [isPassageSubmitLoading, setIsPassageSubmitLoading] = useState(false);
+  // Track which passage_id is selected in the question form
+  const [selectedPassageId, setSelectedPassageId] = useState<string | null | undefined>(undefined);
 
   // Helper for premium dark theme sweet alerts
   const showSwalAlert = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
@@ -200,10 +227,15 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         setQuizTitle(targetQuiz.title);
       }
 
-      // Fetch questions
-      const dataRes = await apiClient(`/api/admin/quizzes/${quizId}/questions`);
+      // Fetch questions and passages in parallel
+      const [dataRes, passagesRes] = await Promise.all([
+        apiClient(`/api/admin/quizzes/${quizId}/questions`),
+        apiClient(`/api/admin/quizzes/${quizId}/passages`),
+      ]);
       const data = dataRes?.data || dataRes || [];
+      const passagesData = passagesRes?.data || passagesRes || [];
       setQuestions(data);
+      setPassages(passagesData);
       
       // Auto expand the first question if exists
       if (data && data.length > 0) {
@@ -213,6 +245,46 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       setError(err?.message || 'Failed to load questions data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // --- PASSAGE ACTIONS ---
+  const handleCreatePassage = async () => {
+    const parsed = passageSchema.safeParse(passageForm);
+    if (!parsed.success) {
+      setPassageFormError(parsed.error.errors[0]?.message || 'Validation error');
+      return;
+    }
+    setIsPassageSubmitLoading(true);
+    setPassageFormError(null);
+    try {
+      await apiClient(`/api/admin/quizzes/${quizId}/passages`, {
+        method: 'POST',
+        body: JSON.stringify({ title: passageForm.title || null, body: passageForm.body }),
+      });
+      setPassageForm({ title: '', body: '' });
+      setIsPassageModalOpen(false);
+      loadData();
+      showSwalAlert('Berhasil', 'Passage berhasil dibuat', 'success');
+    } catch (err: any) {
+      setPassageFormError(err?.message || 'Gagal membuat passage');
+    } finally {
+      setIsPassageSubmitLoading(false);
+    }
+  };
+
+  const handleDeletePassage = async (passageId: string) => {
+    const result = await showSwalConfirm(
+      'Hapus Passage?',
+      'Soal-soal yang terhubung akan menjadi soal mandiri (tidak terhapus).'
+    );
+    if (!result.isConfirmed) return;
+    try {
+      await apiClient(`/api/admin/passages/${passageId}`, { method: 'DELETE' });
+      loadData();
+      showSwalAlert('Berhasil', 'Passage dihapus. Soal terhubung kini berdiri sendiri.', 'success');
+    } catch (err: any) {
+      showSwalAlert('Error', err?.message || 'Gagal menghapus passage', 'error');
     }
   };
 
@@ -227,6 +299,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   // --- QUESTION ACTIONS ---
   const openCreateQModal = () => {
     setEditingQuestion(null);
+    setSelectedPassageId(null);
     resetQ({
       question_text: '',
       question_type: 'single',
@@ -235,12 +308,14 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       order_num: questions.length + 1,
       code_language: '',
       code_content: '',
+      passage_id: null,
     });
     setIsQModalOpen(true);
   };
 
   const openEditQModal = (q: Question) => {
     setEditingQuestion(q);
+    setSelectedPassageId(q.passage_id ?? null);
     resetQ({
       question_text: q.question_text,
       question_type: q.question_type,
@@ -249,6 +324,7 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
       order_num: q.order_num,
       code_language: q.code_language || '',
       code_content: q.code_content || '',
+      passage_id: q.passage_id ?? null,
     });
     setIsQModalOpen(true);
   };
@@ -256,15 +332,16 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
   const onSubmitQ = async (data: QuestionFormValues) => {
     setIsQSubmitLoading(true);
     try {
+      const payload = { ...data, passage_id: selectedPassageId ?? null };
       if (editingQuestion) {
         await apiClient(`/api/admin/questions/${editingQuestion.id}`, {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
       } else {
         await apiClient(`/api/admin/quizzes/${quizId}/questions`, {
           method: 'POST',
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
       }
       setIsQModalOpen(false);
@@ -579,6 +656,17 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
         <div className="flex justify-between items-center">
           <p className="text-slate-400 text-sm">{t('totalQuestions', { count: questions.length })}</p>
           <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setPassageForm({ title: '', body: '' });
+                setPassageFormError(null);
+                setIsPassageModalOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span>Kelola Passage ({passages.length})</span>
+            </button>
             {questions.length > 0 && (
               <button
                 onClick={() => {
@@ -638,7 +726,15 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                         {q.order_num}
                       </span>
                       <div>
-                        <h3 className="font-semibold text-white text-sm md:text-base pr-4 line-clamp-1">{q.question_text}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-white text-sm md:text-base pr-4 line-clamp-1">{q.question_text}</h3>
+                          {q.passage && (
+                            <span className="flex items-center gap-1 rounded-full bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 text-xs font-semibold text-violet-400 shrink-0">
+                              <BookOpen className="h-3 w-3" />
+                              {q.passage.title || 'Passage'}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500" onClick={(e) => e.stopPropagation()}>
                           <span className="capitalize">
                             {q.question_type === 'weighted' ? t('weightedChoice') : (q.question_type === 'multiple' ? t('multipleChoice') : t('singleChoice'))}
@@ -932,6 +1028,34 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
 
+              {/* Passage selector */}
+              {passages.length > 0 && (
+                <div className="space-y-2 border-t border-slate-800/60 pt-4">
+                  <label className="text-sm font-medium text-slate-300 flex items-center gap-1.5">
+                    <BookOpen className="h-3.5 w-3.5 text-violet-400" />
+                    Lampirkan ke Passage (opsional)
+                  </label>
+                  <select
+                    value={selectedPassageId ?? ''}
+                    onChange={(e) => setSelectedPassageId(e.target.value || null)}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-violet-500"
+                  >
+                    <option value="">— Soal mandiri (tanpa passage) —</option>
+                    {passages.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title || `Passage #${p.order_num + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedPassageId && (
+                    <p className="text-xs text-violet-400 flex items-center gap-1">
+                      <BookOpen className="h-3 w-3" />
+                      Soal ini akan dikelompokkan dengan soal lain di passage yang sama dan tidak akan diacak secara terpisah.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Code block section */}
               <div className="space-y-4 border-t border-slate-800/60 pt-4">
                 <div className="space-y-2">
@@ -1174,6 +1298,99 @@ export default function QuestionsPage({ params }: { params: { id: string } }) {
                 >
                   {isBulkSubmitLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
                   <span>{t('apply')}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- PASSAGE MANAGER MODAL --- */}
+      {isPassageModalOpen && (
+        <div
+          onClick={() => setIsPassageModalOpen(false)}
+          className="fixed inset-0 z-[9999] modal-backdrop !mt-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-[95%] max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-violet-400" />
+                  Kelola Passage Teks
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Passage adalah teks wacana yang digunakan bersama oleh beberapa soal.</p>
+              </div>
+              <button onClick={() => setIsPassageModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Existing passages */}
+            {passages.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase text-slate-500 tracking-wider">Passage yang ada</h3>
+                {passages.map((p) => {
+                  const linked = questions.filter(q => q.passage_id === p.id).length;
+                  return (
+                    <div key={p.id} className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-violet-300">{p.title || `Passage #${p.order_num + 1}`}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{linked} soal terhubung</p>
+                        </div>
+                        <button
+                          onClick={() => handleDeletePassage(p.id)}
+                          className="shrink-0 rounded-lg p-1.5 text-rose-400 hover:bg-rose-500/10 transition"
+                          title="Hapus passage"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{p.body}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Create new passage form */}
+            <div className="space-y-4 border-t border-slate-800 pt-4">
+              <h3 className="text-xs font-bold uppercase text-slate-500 tracking-wider">Buat Passage Baru</h3>
+              {passageFormError && (
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-400">{passageFormError}</div>
+              )}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Judul Passage (opsional)</label>
+                <input
+                  type="text"
+                  placeholder="contoh: Teks 1, Bacaan A, ..."
+                  value={passageForm.title}
+                  onChange={(e) => setPassageForm(f => ({ ...f, title: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-violet-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Isi Teks / Wacana <span className="text-rose-400">*</span></label>
+                <textarea
+                  rows={6}
+                  placeholder="Tulis teks wacana di sini..."
+                  value={passageForm.body}
+                  onChange={(e) => setPassageForm(f => ({ ...f, body: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-3.5 text-slate-200 outline-none focus:border-violet-500 resize-y"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCreatePassage}
+                  disabled={isPassageSubmitLoading}
+                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 transition"
+                >
+                  {isPassageSubmitLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
+                  <Plus className="h-4 w-4" />
+                  <span>Buat Passage</span>
                 </button>
               </div>
             </div>
