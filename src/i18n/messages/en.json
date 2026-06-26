@@ -301,7 +301,13 @@
     "proctorViolations": "Proctor Violations",
     "candidateReview": "Candidate Detailed Evaluation",
     "candidateChoice": "(Candidate choice)",
-    "pts": "{points} pts"
+    "pts": "{points} pts",
+    "safeModeViolationDetail": "Safe Mode Violation Details",
+    "elapsedTime": "Elapsed Time",
+    "serverTime": "Server Time",
+    "tabSwitchLabel": "Switched Tab / Browser",
+    "windowBlurLabel": "Window Lost Focus",
+    "copyAttemptLabel": "Attempted to Copy Question Text"
   },
   "Settings": {
     "title": "System Settings",

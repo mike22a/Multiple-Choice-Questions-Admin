@@ -301,7 +301,13 @@
     "proctorViolations": "Pelanggaran Pengawas",
     "candidateReview": "Evaluasi Rinci Kandidat",
     "candidateChoice": "(Pilihan kandidat)",
-    "pts": "{points} poin"
+    "pts": "{points} poin",
+    "safeModeViolationDetail": "Detail Pelanggaran Safe Mode",
+    "elapsedTime": "Waktu Berjalan",
+    "serverTime": "Waktu Server",
+    "tabSwitchLabel": "Pindah Tab / Browser",
+    "windowBlurLabel": "Fokus Keluar Jendela",
+    "copyAttemptLabel": "Mencoba Menyalin Konten Soal"
   },
   "Settings": {
     "title": "Pengaturan Sistem",

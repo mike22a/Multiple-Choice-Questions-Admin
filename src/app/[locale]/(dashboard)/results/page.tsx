@@ -70,6 +70,12 @@ interface AttemptDetail {
       answeredAt: string | null;
     };
   }>;
+  violations?: Array<{
+    id: string;
+    violationType: 'tab_switch' | 'window_blur' | 'copy_attempt';
+    occurredAt: string;
+    elapsedSeconds: number;
+  }>;
 }
 
 export default function ResultsPage() {
@@ -536,6 +542,44 @@ export default function ResultsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Safe Mode Violations Timeline */}
+                {attemptDetail.violations && attemptDetail.violations.length > 0 && (
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5 space-y-3">
+                    <h3 className="font-bold text-rose-400 text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-rose-500" />
+                      {tRes('safeModeViolationDetail')} ({attemptDetail.violations.length})
+                    </h3>
+                    <div className="divide-y divide-rose-500/10 text-xs">
+                      {attemptDetail.violations.map((v, i) => {
+                        const mins = Math.floor(v.elapsedSeconds / 60);
+                        const secs = v.elapsedSeconds % 60;
+                        const elapsedStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                        
+                        return (
+                          <div key={v.id} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-slate-200">
+                                #{i + 1} — {v.violationType === 'tab_switch' ? tRes('tabSwitchLabel') : 
+                                            v.violationType === 'window_blur' ? tRes('windowBlurLabel') : 
+                                            v.violationType === 'copy_attempt' ? tRes('copyAttemptLabel') : 
+                                            v.violationType}
+                              </p>
+                              <p className="text-slate-500 text-[10px]">
+                                {tRes('serverTime')}: {format(new Date(v.occurredAt), 'dd MMM yyyy, HH:mm:ss')}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="inline-flex items-center rounded-lg bg-rose-500/15 border border-rose-500/35 px-2.5 py-1 font-mono text-[11px] font-bold text-rose-400">
+                                {tRes('elapsedTime')}: {elapsedStr}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Candidate Answers Breakdown */}
                 <div className="space-y-4">
